@@ -538,7 +538,14 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			frappe.log_error("WooCommerce Error", error_message)
 
 		self.create_or_update_address(wc_order)
-		create_contact(raw_billing_data, self.customer)
+		contact = create_contact(raw_billing_data, self.customer)
+		self.customer.reload()
+		self.customer.customer_primary_contact = contact.name
+		try:
+			self.customer.save()
+		except Exception:
+			error_message = f"{frappe.get_traceback()}\n\nCustomer Data{str(customer.as_dict())}"
+			frappe.log_error("WooCommerce Error", error_message)
 
 		return customer.name
 
@@ -837,6 +844,8 @@ def create_contact(data, customer):
 
 	contact.flags.ignore_mandatory = True
 	contact.save()
+
+	return contact
 
 
 def add_tax_details(sales_order, price, desc, tax_account_head):
