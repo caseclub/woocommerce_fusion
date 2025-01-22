@@ -27,23 +27,27 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self, wc_server, rate: float, included_in_rate: bool = False
 	) -> str:
 		taxes_and_charges_template = frappe.get_doc(
-			{
-				"company": wc_server.company,
-				"doctype": "Sales Taxes and Charges Template",
-				"taxes": [
-					{
-						"account_head": wc_server.tax_account,
-						"charge_type": "On Net Total",
-						"description": "VAT",
-						"doctype": "Sales Taxes and Charges",
-						"parentfield": "taxes",
-						"rate": rate,
-						"included_in_print_rate": included_in_rate,
-					}
-				],
-				"title": "_Test Sales Taxes and Charges Template for Woo",
-			}
-		).insert(ignore_if_duplicate=True)
+			"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
+		)
+		if not taxes_and_charges_template:
+			taxes_and_charges_template = frappe.get_doc(
+				{
+					"company": wc_server.company,
+					"doctype": "Sales Taxes and Charges Template",
+					"taxes": [
+						{
+							"account_head": wc_server.tax_account,
+							"charge_type": "On Net Total",
+							"description": "VAT",
+							"doctype": "Sales Taxes and Charges",
+							"parentfield": "taxes",
+							"rate": rate,
+							"included_in_print_rate": included_in_rate,
+						}
+					],
+					"title": "_Test Sales Taxes and Charges Template for Woo",
+				}
+			).insert()
 		return taxes_and_charges_template.name
 
 	def test_sync_create_new_sales_order_when_synchronising_with_woocommerce(self, mock_log_error):
@@ -122,7 +126,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_sales_order_with_tax_template_when_synchronising_with_woocommerce(
+	def test_sync_create_new_sales_order_with_tax_template_and_shipping_when_synchronising_with_woocommerce(
 		self, mock_log_error
 	):
 		"""
@@ -141,60 +145,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		wc_server.use_actual_tax_type = 0
 		wc_server.sales_taxes_and_charges_template = template_name
 		wc_server.flags.ignore_mandatory = True
-		wc_server.save()
-
-		# Create a new order in WooCommerce
-		wc_order_id, wc_order_name = self.post_woocommerce_order(
-			payment_method_title="Doge", item_price=10, item_qty=2
-		)
-
-		# Run synchronisation
-		run_sales_order_sync(woocommerce_order_name=wc_order_name)
-
-		# Expect no errors logged
-		mock_log_error.assert_not_called()
-
-		# Expect newly created Sales Order in ERPNext
-		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id}, "name")
-		self.assertIsNotNone(sales_order_name)
-		sales_order = frappe.get_doc("Sales Order", sales_order_name)
-
-		# Expect correct payment method title on Sales Order
-		self.assertEqual(sales_order.woocommerce_payment_method, "Doge")
-
-		# Expect correct items in Sales Order
-		self.assertEqual(sales_order.items[0].rate, 10)  # should show tax inclusive price
-		self.assertEqual(sales_order.items[0].qty, 2)
-
-		# Expect correct tax rows in Sales Order
-		self.assertEqual(sales_order.taxes[0].charge_type, "On Net Total")
-		self.assertEqual(sales_order.taxes[0].rate, 15)
-		self.assertEqual(sales_order.taxes[0].tax_amount, 2.61)  # 20 x 15/115 = 2.61
-		self.assertEqual(sales_order.taxes[0].total, 20)
-		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
-
-		# Delete order in WooCommerce
-		self.delete_woocommerce_order(wc_order_id=wc_order_id)
-
-	def test_sync_create_new_sales_order_with_tax_template_and_shipment_cost_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
-		"""
-		Test that the Sales Order Synchronisation method creates a new Sales order with a Tax Template
-		and Shipment Cost for a new WooCommerce order and a Sales Taxes and Charges template has been set in settings.
-
-		Assumes that the Wordpress Site we're testing against has:
-		- Tax enabled
-		- Sales prices include tax
-		"""
-		# Setup
-		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
-		template_name = self._create_sales_taxes_and_charges_template(
-			wc_server, rate=15, included_in_rate=1
-		)
-		wc_server.use_actual_tax_type = 0
-		wc_server.sales_taxes_and_charges_template = template_name
-		wc_server.flags.ignore_mandatory = True
+		wc_server.shipping_rule_map = []
 		wc_server.save()
 
 		# Create a new order in WooCommerce
@@ -228,8 +179,8 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
 
 		# Expect correct tax rows in Sales Order
-		self.assertEqual(sales_order.taxes[1].account_head, wc_server.f_n_f_account)
-		self.assertEqual(sales_order.taxes[1].tax_amount, 10)
+		self.assertEqual(sales_order.taxes[-1].account_head, wc_server.f_n_f_account)
+		self.assertEqual(sales_order.taxes[-1].tax_amount, 10)
 
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)

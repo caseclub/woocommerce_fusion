@@ -441,8 +441,10 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 		new_sales_order.company = wc_server.company
 		new_sales_order.currency = wc_order.currency
 
-		if (wc_server.enable_shipping_methods_sync) and (
-			shipping_lines := json.loads(wc_order.shipping_lines)
+		if (
+			(wc_server.enable_shipping_methods_sync)
+			and (shipping_lines := json.loads(wc_order.shipping_lines))
+			and len(wc_server.shipping_rule_map) > 0
 		):
 			if len(wc_order.shipping_lines) > 0:
 				shipping_rule_mapping = next(
