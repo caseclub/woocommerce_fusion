@@ -462,7 +462,7 @@
   },
   {
    "depends_on": "eval: doc.enable_so_status_sync",
-   "description": "For example, if you map the ERPNext status \"To Deliver\" to the WooCommerce status \"Processing\", as soon as the ERPNext Sales Order's status changes, an attempt will be made to update the linked WooCommerce Order status to \"Processing\"",
+   "description": "For example if you map the ERPNext status \"To Deliver\" to the WooCommerce status \"Processing\" as soon as the ERPNext Sales Order's status changes an attempt will be made to update the linked WooCommerce Order status to \"Processing\"",
    "fieldname": "sales_order_status_map",
    "fieldtype": "Table",
    "label": "Sales Order Status Map",

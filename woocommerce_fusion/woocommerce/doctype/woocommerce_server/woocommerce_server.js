@@ -85,6 +85,14 @@ frappe.ui.form.on('WooCommerce Server', {
 				);
 
 				frappe.dom.unfreeze();
+			},
+			error: function() {
+				frappe.dom.unfreeze();
+				frappe.msgprint({
+					message: __("Failed to fetch shipping methods."),
+					title: __("Linking Failed"),
+					indicator: "red",
+				});
 			}
 		});
 	},

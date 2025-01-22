@@ -26,24 +26,32 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 	def _create_sales_taxes_and_charges_template(
 		self, wc_server, rate: float, included_in_rate: bool = False
 	) -> str:
-		taxes_and_charges_template = frappe.get_doc(
-			{
-				"company": wc_server.company,
-				"doctype": "Sales Taxes and Charges Template",
-				"taxes": [
-					{
-						"account_head": wc_server.tax_account,
-						"charge_type": "On Net Total",
-						"description": "VAT",
-						"doctype": "Sales Taxes and Charges",
-						"parentfield": "taxes",
-						"rate": rate,
-						"included_in_print_rate": included_in_rate,
-					}
-				],
-				"title": "_Test Sales Taxes and Charges Template for Woo",
-			}
-		).insert(ignore_if_duplicate=True)
+		taxes_and_charges_template = None
+		if frappe.db.exists(
+			"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
+		):
+			taxes_and_charges_template = frappe.get_doc(
+				"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
+			)
+		else:
+			taxes_and_charges_template = frappe.get_doc(
+				{
+					"company": wc_server.company,
+					"doctype": "Sales Taxes and Charges Template",
+					"taxes": [
+						{
+							"account_head": wc_server.tax_account,
+							"charge_type": "On Net Total",
+							"description": "VAT",
+							"doctype": "Sales Taxes and Charges",
+							"parentfield": "taxes",
+							"rate": rate,
+							"included_in_print_rate": included_in_rate,
+						}
+					],
+					"title": "_Test Sales Taxes and Charges Template for Woo",
+				}
+			).insert()
 		return taxes_and_charges_template.name
 
 	def test_sync_create_new_sales_order_when_synchronising_with_woocommerce(self, mock_log_error):
@@ -122,7 +130,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_sales_order_with_tax_template_when_synchronising_with_woocommerce(
+	def test_sync_create_new_sales_order_with_tax_template_and_shipping_when_synchronising_with_woocommerce(
 		self, mock_log_error
 	):
 		"""
@@ -141,11 +149,12 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		wc_server.use_actual_tax_type = 0
 		wc_server.sales_taxes_and_charges_template = template_name
 		wc_server.flags.ignore_mandatory = True
+		wc_server.shipping_rule_map = []
 		wc_server.save()
 
 		# Create a new order in WooCommerce
 		wc_order_id, wc_order_name = self.post_woocommerce_order(
-			payment_method_title="Doge", item_price=10, item_qty=2
+			payment_method_title="Doge", item_price=10, item_qty=2, shipping_method_id="flat_rate"
 		)
 
 		# Run synchronisation
@@ -172,6 +181,10 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.assertEqual(sales_order.taxes[0].tax_amount, 2.61)  # 20 x 15/115 = 2.61
 		self.assertEqual(sales_order.taxes[0].total, 20)
 		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
+
+		# Expect correct tax rows in Sales Order
+		self.assertEqual(sales_order.taxes[-1].account_head, wc_server.f_n_f_account)
+		self.assertEqual(sales_order.taxes[-1].tax_amount, 10)
 
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
@@ -488,6 +501,60 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 
 		# Expect correct Shipping Rule on Sales Order
 		self.assertEqual(sales_order.shipping_rule, sr.name)
+
+		# Delete order in WooCommerce
+		self.delete_woocommerce_order(wc_order_id=wc_order_id)
+
+	@patch("woocommerce_fusion.tasks.sync_sales_orders.frappe.enqueue")
+	def test_sync_updates_woocommerce_order_status_when_synchronising_with_woocommerce(
+		self, mock_enqueue, mock_log_error
+	):
+		"""
+		Test that the Sales Order Synchronisation method updates a WooCommerce Order's status
+		with the correct mapped value if auto status sync is enabled
+		"""
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.submit_sales_orders = 1
+		wc_server.enable_payments_sync = 0
+		wc_server.enable_so_status_sync = 1
+		wc_server.sales_order_status_map = []
+		wc_server.append(
+			"sales_order_status_map",
+			{
+				"erpnext_sales_order_status": "On Hold",
+				"woocommerce_sales_order_status": "On hold",
+			},
+		)
+		wc_server.flags.ignore_mandatory = True
+		wc_server.save()
+
+		# Create a new order in WooCommerce
+		wc_order_id, wc_order_name = self.post_woocommerce_order(
+			payment_method_title="Doge", item_price=10, item_qty=3
+		)
+
+		# Run synchronisation for the ERPNext Sales Order to be created
+		run_sales_order_sync(woocommerce_order_name=wc_order_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Sales Order in ERPNext
+		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id}, "name")
+		self.assertIsNotNone(sales_order_name)
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+
+		# In ERPNext, change order status
+		sales_order.update_status("On Hold")
+
+		# Run synchronisation again, to sync the Sales Order changes
+		run_sales_order_sync(sales_order_name=sales_order.name)
+		mock_log_error.assert_not_called()
+
+		# Expect WooCommerce Order to have updated status
+		wc_order = self.get_woocommerce_order(order_id=wc_order_id)
+		self.assertEqual(wc_order["status"], "on-hold")
 
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
