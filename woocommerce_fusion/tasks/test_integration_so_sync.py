@@ -26,13 +26,14 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 	def _create_sales_taxes_and_charges_template(
 		self, wc_server, rate: float, included_in_rate: bool = False
 	) -> str:
+		taxes_and_charges_template = None
 		if frappe.db.exists(
 			"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
 		):
 			taxes_and_charges_template = frappe.get_doc(
 				"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
 			)
-		if not taxes_and_charges_template:
+		else:
 			taxes_and_charges_template = frappe.get_doc(
 				{
 					"company": wc_server.company,
