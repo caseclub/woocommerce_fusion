@@ -234,6 +234,9 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				sales_order.woocommerce_status = wc_order_status
 				so_dirty = True
 
+			if sales_order.custom_woocommerce_customer_note != woocommerce_order.customer_note:
+				sales_order.custom_woocommerce_customer_note = woocommerce_order.customer_note
+
 			# Update the payment_method_title field if necessary, use the payment method ID
 			# if the title field is too long
 			payment_method = (
@@ -422,6 +425,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 		new_sales_order = frappe.new_doc("Sales Order")
 		new_sales_order.customer = customer_docname
 		new_sales_order.po_no = new_sales_order.woocommerce_id = wc_order.id
+		new_sales_order.custom_woocommerce_customer_note = wc_order.customer_note
 
 		new_sales_order.woocommerce_status = WC_ORDER_STATUS_MAPPING_REVERSE[wc_order.status]
 		wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)

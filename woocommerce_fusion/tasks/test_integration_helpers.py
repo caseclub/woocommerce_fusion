@@ -95,6 +95,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		email: str = "john.doe@example.com",
 		address_1: str = "123 Main St",
 		shipping_method_id: str = None,
+		customer_note: str = None,
 	) -> Tuple[str, str]:
 		"""
 		Create a dummy order on a WooCommerce testing site
@@ -151,6 +152,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 			data["shipping_lines"] = [
 				{"method_id": shipping_method_id, "method_title": shipping_method_id, "total": "10.00"}
 			]
+		if customer_note:
+			data["customer_note"] = customer_note
 		payload = json.dumps(data)
 		headers = {"Content-Type": "application/json"}
 
