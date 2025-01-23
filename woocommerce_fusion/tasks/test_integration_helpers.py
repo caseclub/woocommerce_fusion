@@ -167,6 +167,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		regular_price: float = 10,
 		type: str = "simple",
 		attributes: List[str] = ["Material Type", "Volume"],
+		image_url: str = None,
 	) -> int:
 		"""
 		Create a dummy product on a WooCommerce testing site
@@ -217,6 +218,9 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 				{"name": attr, "slug": attr.lower().replace(" ", "_"), "option": "Option 1"}
 				for attr in attributes
 			]
+
+		if image_url:
+			payload["images"] = [{"src": image_url}]
 
 		payload = json.dumps(payload)
 		headers = {"Content-Type": "application/json"}

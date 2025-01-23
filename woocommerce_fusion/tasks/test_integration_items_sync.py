@@ -47,6 +47,42 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		# Expect correct custom mapped field values
 		self.assertEqual(item.description, "<p>SOME_ITEM</p>\n")
 
+	def test_sync_create_new_item_with_image_when_synchronising_with_woocommerce(
+		self, mock_log_error
+	):
+		"""
+		Test that the Item Synchronisation method creates a new Item with image when there are new
+		WooCommerce products.
+		"""
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.enable_image_sync = 1
+		wc_server.save()
+
+		# Create a new product in WooCommerce
+		wc_product_id = self.post_woocommerce_product(
+			product_name="SOME_ITEM",
+			image_url="https://woocommerce.com/wp-content/uploads/2023/02/chrislema-hat.png",
+		)
+
+		# Run synchronisation
+		woocommerce_product_name = generate_woocommerce_record_name_from_domain_and_id(
+			self.wc_server.name, wc_product_id
+		)
+		run_item_sync(woocommerce_product_name=woocommerce_product_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Item in ERPNext
+		items = get_items_for_wc_product(wc_product_id, self.wc_server.name)
+		self.assertEqual(len(items), 1)
+		item = items[0]
+		self.assertIsNotNone(item)
+
+		# Expect correct image in item
+		self.assertTrue("chrislema-hat" in item.image)
+
 	def test_sync_create_new_template_item_when_synchronising_with_woocommerce(self, mock_log_error):
 		"""
 		Test that the Item Synchronisation method creates new Template Item from a WooCommerce Product with Variations
