@@ -29,15 +29,16 @@ When comparing a **WooCommerce Item** with it's counterpart ERPNext **Item**, th
 
 ## Fields Mapping
 
-| WooCommerce  | ERPNext      | Note                                                                                          |
-| ------------ | ------------ | --------------------------------------------------------------------------------------------- |
-| `id`         | *Item Code*  | Only if *Default Item Code Naming Basis* is set to *WooCommerce ID* on **WooCommerce Server** |
-| `sku`        | *Item Code*  | Only if *Default Item Code Naming Basis* is set to *Product SKU* on **WooCommerce Server**    |
-| `name`       | *Item Name*  |                                                                                               |
-| `type`       |              | `simple` ≡ Normal **Item**                                                                    |
-|              |              | `variable` ≡ Template **Item** (*Has Variants* is checked).                                   |
-|              |              | `variant` ≡ **Item** Variant (*Variant Of* is set)                                            |
-| `attributes` | *Attributes* | Missing **Item Attributes* will automatically be created in both systems                      |
+| WooCommerce  | ERPNext      | Note                                                                                                                       |
+| ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | *Item Code*  | Only if *Default Item Code Naming Basis* is set to *WooCommerce ID* on **WooCommerce Server**                              |
+| `sku`        | *Item Code*  | Only if *Default Item Code Naming Basis* is set to *Product SKU* on **WooCommerce Server**                                 |
+| `name`       | *Item Name*  |                                                                                                                            |
+| `type`       |              | `simple` ≡ Normal **Item**                                                                                                 |
+|              |              | `variable` ≡ Template **Item** (*Has Variants* is checked).                                                                |
+|              |              | `variant` ≡ **Item** Variant (*Variant Of* is set)                                                                         |
+| `attributes` | *Attributes* | Missing **Item Attributes* will automatically be created in both systems                                                   |
+| `images[0]`  | *Image*      | One way sync - the URL of the first image on WooCommerce will be saved in the Image field. Setting  needs to be turned on. |
 
 ## Custom Fields Mapping
 It is possible to map fields that you want to be synchronised. For example, to synchronise a **WooCommerce Product**'s `short_description` field to an ERPNext **Item**'s `description` field, add the following *Field Mapping*:
