@@ -41,9 +41,26 @@ When comparing a **WooCommerce Item** with it's counterpart ERPNext **Item**, th
 | `images[0]`  | *Image*      | One way sync - the URL of the first image on WooCommerce will be saved in the Image field. Setting  needs to be turned on. |
 
 ## Custom Fields Mapping
-It is possible to map fields that you want to be synchronised. For example, to synchronise a **WooCommerce Product**'s `short_description` field to an ERPNext **Item**'s `description` field, add the following *Field Mapping*:
 
-![Item Fields Mapping](../images/item-fields-mapping.png)
+You can use [JSONPath](https://pypi.org/project/jsonpath-ng/) to map **Item** fields to specific **WooCommerce Product** fields.
+
+Here are a few examples:
+- `$.short_description` retrieves the content of the 'Short Description' WooCommerce Product field.
+- `$.meta_data[0].id` retrieves the content of the first item's `id` field in the WooCommerce Product Metadata.
+- `$.meta_data[?(@.key=='main_product_max_quantity_to_all')].value` retrieves the value of a Metadata entry with a `key` of `main_product_max_quantity_to_all`
+
+where `$` refers to the **WooCommerce Product** object
+
+
+![Item Fields Mapping](../images/item-fields-mapping-2.png)
+
+To figure out the correct JSONPath expression, you can:
+1. Go to any **WooCommerce Request Log** and filter for the `products` endpoints
+2. Open [JSONPath Online Validator](https://jsonpath.com/) and copy the relevant object from the **WooCommerce Request Log** *Response* field to the *Document* text box.
+3. Play around to get the JSONPath Query to return what you need. LLM's can be a big help here.
+
+
+
 
 **Note that this is recommended for advanced users only. This is a very basic functionality - there are no field type conversions possible as of yet.
 

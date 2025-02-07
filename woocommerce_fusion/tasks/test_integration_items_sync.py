@@ -83,6 +83,55 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		# Expect correct image in item
 		self.assertTrue("chrislema-hat" in item.image)
 
+	def test_sync_create_new_item_with_image_when_synchronising_with_woocommerce(
+		self, mock_log_error
+	):
+		"""
+		Test that the Item Synchronisation method creates a new ERPNext Item with mapped custom fields.
+		"""
+		dummy_meta_data = [
+			{"id": 52824, "key": "_short_description_1", "value": "Test 1"},
+			{"id": 52825, "key": "_short_description_2", "value": "Test 2"},
+		]
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		# Map Erpnext Item description to WC Product Meta Data with key '_short_description_2'
+		wc_server.item_field_map = []
+		row = wc_server.append("item_field_map")
+		row.erpnext_field_name = "description | Description"
+		row.woocommerce_field_name = "$.meta_data[?(@.key=='_short_description_2')].value"
+		wc_server.save()
+
+		# Create a new product in WooCommerce
+		wc_product_id = self.post_woocommerce_product(
+			product_name="SOME_ITEM",
+			image_url="https://woocommerce.com/wp-content/uploads/2023/02/chrislema-hat.png",
+			meta_data=dummy_meta_data,
+		)
+
+		# Run synchronisation
+		woocommerce_product_name = generate_woocommerce_record_name_from_domain_and_id(
+			self.wc_server.name, wc_product_id
+		)
+		run_item_sync(woocommerce_product_name=woocommerce_product_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Item in ERPNext
+		items = get_items_for_wc_product(wc_product_id, self.wc_server.name)
+		self.assertEqual(len(items), 1)
+		item = items[0]
+		self.assertIsNotNone(item)
+
+		# Expect value in mapped field in Item
+		self.assertEqual(item.description, "Test 2")
+
+		# Clean Up
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.item_field_map = []
+		wc_server.save()
+
 	def test_sync_create_new_template_item_when_synchronising_with_woocommerce(self, mock_log_error):
 		"""
 		Test that the Item Synchronisation method creates new Template Item from a WooCommerce Product with Variations
@@ -276,6 +325,94 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		self.assertEqual(len(wc_product["attributes"]), 1)
 		self.assertEqual(wc_product["attributes"][0]["name"], "Material Type")
 		self.assertEqual(wc_product["attributes"][0]["option"], "Option 2")
+
+	def test_sync_create_new_wc_product_when_synchronising_with_woocommerce(self, mock_log_error):
+		"""
+		Test that the Item Synchronisation method creates a new WooCommerce product with mapped custom fields.
+		"""
+		dummy_meta_data = [{"id": 52824, "key": "_short_description_1", "value": "Test 1"}]
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		# Map Erpnext Item description to WC Product Meta Data with key '_short_description_1'
+		wc_server.item_field_map = []
+		row = wc_server.append("item_field_map")
+		row.erpnext_field_name = "description | Description"
+		row.woocommerce_field_name = "$.meta_data[?(@.key=='_short_description_1')].value"
+		wc_server.save()
+		# Create a new item in ERPNext and set a WooCommerce server but not a product ID
+		item = create_item("ITEM102", valuation_rate=10)
+		row = item.append("woocommerce_servers")
+		row.woocommerce_server = self.wc_server.name
+		item.save()
+
+		# Run synchronisation
+		run_item_sync(item_code=item.name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Get the updated item
+		item.reload()
+
+		# Expect newly created WooCommerce Product
+		wc_product = self.get_woocommerce_product(product_id=item.woocommerce_servers[0].woocommerce_id)
+
+		# Preset the WooCommerce Product's Metadata field and sync again
+		self.update_woocommerce_product_metadata(wc_product["id"], dummy_meta_data)
+		item.description = "Description from ERPNext"
+		item.save()
+		run_item_sync(item_code=item.name)
+
+		# Expect correct custom mapped field values
+		wc_product = self.get_woocommerce_product(product_id=item.woocommerce_servers[0].woocommerce_id)
+		self.assertEqual(wc_product["meta_data"][0]["key"], "_short_description_1")
+		self.assertEqual(wc_product["meta_data"][0]["value"], "Description from ERPNext")
+
+		# Clean Up
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.item_field_map = []
+		wc_server.save()
+
+	def test_sync_create_new_variable_wc_product_when_synchronising_with_woocommerce(
+		self, mock_log_error
+	):
+		"""
+		Test that the Item Synchronisation method creates a new Variable WooCommerce product
+		when there is a new Template Item in ERPNext
+		"""
+		# Create a new item in ERPNext and set a WooCommerce server but not a product ID
+		item = create_item("ITEM100", valuation_rate=10)
+		row = item.append("woocommerce_servers")
+		row.woocommerce_server = self.wc_server.name
+
+		# Make this item a Template item with Attributes
+		item.has_variants = 1
+		for attr in ["Material Type", "Volume"]:
+			create_item_attribute(attr)
+			row = item.append("attributes")
+			row.attribute = attr
+
+		item.save()
+
+		# Run synchronisation
+		run_item_sync(item_code=item.name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Get the updated item
+		item.reload()
+
+		# Expect newly created WooCommerce Product
+		wc_product = self.get_woocommerce_product(product_id=item.woocommerce_servers[0].woocommerce_id)
+		self.assertEqual(wc_product["type"], "variable")
+
+		# Expect attributes to be set
+		self.assertEqual(len(wc_product["attributes"]), 2)
+		self.assertEqual(wc_product["attributes"][0]["name"], "Material Type")
+		self.assertEqual(wc_product["attributes"][0]["variation"], True)
+		self.assertEqual(wc_product["attributes"][1]["name"], "Volume")
+		self.assertEqual(wc_product["attributes"][1]["variation"], True)
 
 
 def get_items_for_wc_product(woocommerce_id: str, woocommerce_server: str):

@@ -171,6 +171,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		type: str = "simple",
 		attributes: List[str] = ["Material Type", "Volume"],
 		image_url: str = None,
+		meta_data: List[dict] = None,
 	) -> int:
 		"""
 		Create a dummy product on a WooCommerce testing site
@@ -224,6 +225,9 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		if image_url:
 			payload["images"] = [{"src": image_url}]
+
+		if meta_data:
+			payload["meta_data"] = meta_data
 
 		payload = json.dumps(payload)
 		headers = {"Content-Type": "application/json"}
@@ -376,6 +380,34 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		attribute_data = response.json()
 
 		return attribute_data
+
+	def update_woocommerce_product_metadata(
+		self,
+		product_id: int,
+		meta_data: List[dict],
+	) -> int:
+		"""
+		Update a product on a WooCommerce testing site
+		"""
+		import json
+
+		from requests_oauthlib import OAuth1Session
+
+		# Initialize OAuth1 session
+		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+
+		# API Endpoint
+		url = f"{self.wc_url}/wp-json/wc/v3/products/{product_id}"
+
+		payload = {"meta_data": meta_data}
+
+		payload = json.dumps(payload)
+		headers = {"Content-Type": "application/json"}
+
+		# Making the API call
+		response = oauth.post(url, headers=headers, data=payload)
+
+		return response.json()["id"]
 
 
 def create_bank_account(

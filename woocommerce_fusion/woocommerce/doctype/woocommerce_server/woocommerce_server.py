@@ -8,6 +8,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils.caching import redis_cache
+from jsonpath_ng.ext import parse
 from woocommerce import API
 
 from woocommerce_fusion.woocommerce.doctype.woocommerce_order.woocommerce_order import (
@@ -37,6 +38,7 @@ class WooCommerceServer(Document):
 			self.secret = frappe.generate_hash()
 
 		self.validate_so_status_map()
+		self.validate_item_map()
 
 	def validate_so_status_map(self):
 		"""
@@ -48,6 +50,27 @@ class WooCommerceServer(Document):
 		wc_so_statuses = [map.woocommerce_sales_order_status for map in self.sales_order_status_map]
 		if len(wc_so_statuses) != len(set(wc_so_statuses)):
 			frappe.throw(_("Duplicate WooCommerce Sales Order Statuses found in Sales Order Status Map"))
+
+	def validate_item_map(self):
+		"""
+		Validate Item Map to have valid JSONPath expressions
+		"""
+		disallowed_fields = ["attributes", "images"]
+		if self.item_field_map:
+			for map in self.item_field_map:
+				jsonpath_expr = map.woocommerce_field_name
+				try:
+					parse(jsonpath_expr)
+				except Exception as e:
+					frappe.throw(
+						_("Invalid JSONPath syntax in Item Field Map Row {0}:<br><br><pre>{1}</pre>").format(
+							map.idx, e
+						)
+					)
+
+				for field in disallowed_fields:
+					if field in jsonpath_expr:
+						frappe.throw(_("Field '{0}' is not allowed in JSONPath expression").format(field))
 
 	def get_shipment_providers(self):
 		"""
