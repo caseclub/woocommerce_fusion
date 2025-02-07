@@ -268,6 +268,13 @@ class SynchroniseItem(SynchroniseWooCommerce):
 			item.item.save()
 		self.set_item_fields()
 
+		wc_server = frappe.get_cached_doc("WooCommerce Server", woocommerce_product.woocommerce_server)
+		if wc_server.enable_image_sync:
+			wc_product_images = json.loads(woocommerce_product.images)
+			if len(wc_product_images) > 0:
+				if item.image != wc_product_images[0]["src"]:
+					item.image = wc_product_images[0]["src"]
+
 		self.set_sync_hash()
 
 	def update_woocommerce_product(
@@ -409,6 +416,12 @@ class SynchroniseItem(SynchroniseWooCommerce):
 		row.woocommerce_server = wc_server.name
 		item.flags.ignore_mandatory = True
 		item.flags.created_by_sync = True
+
+		if wc_server.enable_image_sync:
+			wc_product_images = json.loads(wc_product.images)
+			if len(wc_product_images) > 0:
+				item.image = wc_product_images[0]["src"]
+
 		item.insert()
 
 		self.item = ERPNextItemToSync(

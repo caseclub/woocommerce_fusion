@@ -65,7 +65,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		"""
 		# Create a new order in WooCommerce
 		wc_order_id, wc_order_name = self.post_woocommerce_order(
-			payment_method_title="Doge", item_price=10, item_qty=1
+			payment_method_title="Doge", item_price=10, item_qty=1, customer_note="The big brown fox"
 		)
 
 		# Run synchronisation
@@ -92,6 +92,9 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.assertEqual(sales_order.taxes[0].tax_amount, 1.3)
 		self.assertEqual(sales_order.taxes[0].total, 10)
 		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
+
+		# Expect correct customer note
+		self.assertEqual(sales_order.custom_woocommerce_customer_note, "The big brown fox")
 
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)

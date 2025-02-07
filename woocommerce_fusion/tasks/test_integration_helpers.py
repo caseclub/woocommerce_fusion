@@ -95,6 +95,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		email: str = "john.doe@example.com",
 		address_1: str = "123 Main St",
 		shipping_method_id: str = None,
+		customer_note: str = None,
 	) -> Tuple[str, str]:
 		"""
 		Create a dummy order on a WooCommerce testing site
@@ -151,6 +152,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 			data["shipping_lines"] = [
 				{"method_id": shipping_method_id, "method_title": shipping_method_id, "total": "10.00"}
 			]
+		if customer_note:
+			data["customer_note"] = customer_note
 		payload = json.dumps(data)
 		headers = {"Content-Type": "application/json"}
 
@@ -167,6 +170,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		regular_price: float = 10,
 		type: str = "simple",
 		attributes: List[str] = ["Material Type", "Volume"],
+		image_url: str = None,
 	) -> int:
 		"""
 		Create a dummy product on a WooCommerce testing site
@@ -217,6 +221,9 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 				{"name": attr, "slug": attr.lower().replace(" ", "_"), "option": "Option 1"}
 				for attr in attributes
 			]
+
+		if image_url:
+			payload["images"] = [{"src": image_url}]
 
 		payload = json.dumps(payload)
 		headers = {"Content-Type": "application/json"}
