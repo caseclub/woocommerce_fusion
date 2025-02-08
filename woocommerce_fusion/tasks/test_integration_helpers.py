@@ -96,6 +96,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		address_1: str = "123 Main St",
 		shipping_method_id: str = None,
 		customer_note: str = None,
+		coupon_code: str = None,
 	) -> Tuple[str, str]:
 		"""
 		Create a dummy order on a WooCommerce testing site
@@ -154,6 +155,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 			]
 		if customer_note:
 			data["customer_note"] = customer_note
+		if coupon_code:
+			data["coupon_lines"] = [{"code": coupon_code}]
 		payload = json.dumps(data)
 		headers = {"Content-Type": "application/json"}
 
@@ -162,6 +165,37 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		id = response.json()["id"]
 		return id, self.wc_server.name + WC_RESOURCE_DELIMITER + str(response.json()["id"])
+
+	def post_woocommerce_coupon(self, coupon_code: int, percent_discount: int) -> Tuple[str, str]:
+		"""
+		Create a coupon on a WooCommerce testing site
+		"""
+		import json
+
+		from requests_oauthlib import OAuth1Session
+
+		# Initialize OAuth1 session
+		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+
+		# API Endpoint
+		url = f"{self.wc_url}/wp-json/wc/v3/coupons"
+
+		data = {
+			"code": coupon_code,
+			"discount_type": "percent",
+			"amount": str(percent_discount),
+			"individual_use": True,
+			"exclude_sale_items": True,
+		}
+
+		payload = json.dumps(data)
+		headers = {"Content-Type": "application/json"}
+
+		# Making the API call
+		response = oauth.post(url, headers=headers, data=payload)
+
+		id = response.json()["id"]
+		return id
 
 	def post_woocommerce_product(
 		self,
