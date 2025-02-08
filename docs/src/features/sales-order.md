@@ -65,8 +65,9 @@ Each **Customer** record has a `woocommerce_identifier` custom field. This ident
 ## Shipping Rule Synchronisation
 - You can enable the synchronisation of WooCommerce Shipping Methods to ERPNext Shipping Rules on Sales Orders
 - For this to work, you have to map WooCommerce Shipping Methods to ERPNext Shipping Rules 
+  - You can find the *WooCommerce Shipping Method Title* fields by looking at the `method_title` values in **WooCommerce Order** > *Shipping Lines*
 
-![Sales Order Sync Shipping Rule Map](../images/so-shipping-rule.png)
+![Sales Order Sync Shipping Rule Map](../images/so-shipping-rule-2.png)
 
 
 ## Automatic Order Status Synchronisation

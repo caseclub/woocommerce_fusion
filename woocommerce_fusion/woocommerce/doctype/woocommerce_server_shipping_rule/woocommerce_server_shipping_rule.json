@@ -11,10 +11,11 @@
  ],
  "fields": [
   {
+   "description": "<code>method_title</code> in <i>WooCommerce Order<i> &gt; <i>Shipping Lines</i></i></i>",
    "fieldname": "wc_shipping_method_id",
-   "fieldtype": "Select",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "WooCommerce Shipping Method ID",
+   "label": "WooCommerce Shipping Method Title",
    "reqd": 1
   },
   {
@@ -29,7 +30,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-12-16 07:09:38.521119",
+ "modified": "2025-02-08 14:46:52.813670",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server Shipping Rule",

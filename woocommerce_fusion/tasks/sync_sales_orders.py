@@ -455,7 +455,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 					(
 						rule
 						for rule in wc_server.shipping_rule_map
-						if rule.wc_shipping_method_id == shipping_lines[0]["method_id"]
+						if rule.wc_shipping_method_id == shipping_lines[0]["method_title"]
 					),
 					None,
 				)
