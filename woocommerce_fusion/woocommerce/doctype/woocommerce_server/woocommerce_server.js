@@ -36,10 +36,6 @@ frappe.ui.form.on('WooCommerce Server', {
 			}
 		});
 
-		if (frm.doc.enable_shipping_methods_sync && !frm.fields_dict.shipping_rule_map.grid.get_docfield("wc_shipping_method_id").options) {
-			frm.trigger('get_shipping_methods');
-		}
-
 		if (frm.doc.enable_so_status_sync && !frm.fields_dict.sales_order_status_map.grid.get_docfield("woocommerce_sales_order_status").options) {
 			frm.trigger('get_woocommerce_order_status_list');
 		}
@@ -55,46 +51,11 @@ frappe.ui.form.on('WooCommerce Server', {
 		frm.set_df_property('enable_so_status_sync_warning_html', 'options', warningHTML);
 		frm.refresh_field('enable_so_status_sync_warning_html');
 	},
-	// Handle click of 'Enable Shipping Methods Sync'
-	enable_shipping_methods_sync: function(frm){
-		if (frm.doc.enable_shipping_methods_sync){
-			frm.trigger('get_shipping_methods');
-		}
-	},
 	// Handle click of 'Keep the Status of ERPNext Sales Orders and WooCommerce Orders in sync'
 	enable_so_status_sync: function(frm){
 		if (frm.doc.enable_so_status_sync && !frm.fields_dict.sales_order_status_map.grid.get_docfield("woocommerce_sales_order_status").options){
 			frm.trigger('get_woocommerce_order_status_list');
 		}
-	},
-	// Retrieve shipping methods
-	get_shipping_methods: function(frm){
-		frappe.dom.freeze(__("Fetching Shipping Methods from WooCommerce"));
-		frappe.call({
-			method: "get_shipping_methods",
-			doc: frm.doc,
-			callback: function(r) {
-				// Join the strings with newline characters to create the final string
-				const options = r.message.join('\n');
-
-				// Set the Options property
-				frm.fields_dict.shipping_rule_map.grid.update_docfield_property(
-					"wc_shipping_method_id",
-					"options",
-					options
-				);
-
-				frappe.dom.unfreeze();
-			},
-			error: function() {
-				frappe.dom.unfreeze();
-				frappe.msgprint({
-					message: __("Failed to fetch shipping methods."),
-					title: __("Linking Failed"),
-					indicator: "red",
-				});
-			}
-		});
 	},
 	// Retrieve WooCommerce order statuses
 	get_woocommerce_order_status_list: function(frm){

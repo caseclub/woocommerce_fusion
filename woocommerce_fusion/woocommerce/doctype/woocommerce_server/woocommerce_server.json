@@ -444,6 +444,7 @@
   },
   {
    "default": "0",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/sales-order.html#shipping-rule-synchronisation",
    "fieldname": "enable_shipping_methods_sync",
    "fieldtype": "Check",
    "label": "Enable Shipping Methods Sync"
@@ -463,6 +464,7 @@
   {
    "default": "0",
    "description": "When enabled the Order Status for both ERPNext and WooCommerce orders will be automatically updated if either changes",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/sales-order.html#automatic-order-status-synchronisation",
    "fieldname": "enable_so_status_sync",
    "fieldtype": "Check",
    "label": "Keep the Status of ERPNext Sales Orders and WooCommerce Orders in sync"
@@ -490,7 +492,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-07 16:52:11.499350",
+ "modified": "2025-02-08 14:41:23.773997",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",

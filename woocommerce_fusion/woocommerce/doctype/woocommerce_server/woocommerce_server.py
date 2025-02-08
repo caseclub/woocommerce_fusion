@@ -123,19 +123,6 @@ class WooCommerceServer(Document):
 
 	@frappe.whitelist()
 	@redis_cache(ttl=86400)
-	def get_shipping_methods(self) -> List[str]:
-		"""
-		Retrieve list of Shipping Methods from WooCommerce
-		"""
-		woocommerce_shipping_method = frappe.get_doc({"doctype": "WooCommerce Shipping Method"})
-		shipping_methods = woocommerce_shipping_method.get_list(
-			args={"filters": {}, "page_lenth": 100, "start": 0, "as_doc": True}
-		)
-
-		return [method.woocommerce_id for method in shipping_methods]
-
-	@frappe.whitelist()
-	@redis_cache(ttl=86400)
 	def get_woocommerce_order_status_list(self) -> List[str]:
 		"""
 		Retrieve list of WooCommerce Order Statuses
