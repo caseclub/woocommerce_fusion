@@ -131,6 +131,7 @@
   },
   {
    "description": "This company will be used to create Sales Orders.",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/sales-order.html",
    "fieldname": "company",
    "fieldtype": "Link",
    "label": "Company",
@@ -199,6 +200,7 @@
   },
   {
    "default": "1",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/configure.html",
    "fieldname": "enable_sync",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -227,6 +229,7 @@
   },
   {
    "default": "0",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/woocommerce-plugins.html",
    "fieldname": "wc_plugin_advanced_shipment_tracking",
    "fieldtype": "Check",
    "label": "Enable integration with 'Advanced Shipment Tracking' WooCommerce Plugin"
@@ -268,6 +271,7 @@
   },
   {
    "default": "0",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/item-prices.html",
    "fieldname": "enable_price_list_sync",
    "fieldtype": "Check",
    "label": "Enable Price List Sync"
@@ -353,6 +357,7 @@
   },
   {
    "default": "0",
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/item-stock-levels.html",
    "fieldname": "enable_stock_level_synchronisation",
    "fieldtype": "Check",
    "label": "Enable Stock Level Synchronisation"
@@ -400,6 +405,7 @@
    "label": "Item Fields"
   },
   {
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/items.html#custom-fields-mapping",
    "fieldname": "item_field_map",
    "fieldtype": "Table",
    "label": "Fields Mapping",
@@ -484,7 +490,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-01-23 08:46:09.648730",
+ "modified": "2025-02-07 16:52:11.499350",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",

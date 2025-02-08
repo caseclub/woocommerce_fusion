@@ -48,7 +48,7 @@ Note that if sync for an **Item** is disabled (i.e. the "Enabled" checkbox on th
 | customer_note | **Sales Order** > *WooCommerce Customer Note* |                                                                                                                                                                                       |
 
 
-**Customer Synchronisation**
+## Customer Synchronisation
 
 Each **Customer** record has a `woocommerce_identifier` custom field. This identifier is set depending on if the **WooCommerce Order** is from a guest or not:
 
@@ -58,18 +58,18 @@ Each **Customer** record has a `woocommerce_identifier` custom field. This ident
 | Company (`billing.company` on **WooCommerce Order** is set)        | `{billing.email}-{company}` |
 | Individual (`billing.company` on **WooCommerce Order** is not set) | `billing.email`             |
 
-**Address Synchronisation**
+## Address Synchronisation
 - If the billing and shipping address on the **WooCommerce Order** is the same, a single **Address** will be created with both the *Preferred Billing Address* and *Preferred Shipping Address* checkboxes ticked.
 - If an address with *Preferred Billing Address*/*Preferred Shipping Address* ticked aleady exists, this address will be updated
 
-**Shipping Rule Synchronisation**
+## Shipping Rule Synchronisation
 - You can enable the synchronisation of WooCommerce Shipping Methods to ERPNext Shipping Rules on Sales Orders
 - For this to work, you have to map WooCommerce Shipping Methods to ERPNext Shipping Rules 
 
 ![Sales Order Sync Shipping Rule Map](../images/so-shipping-rule.png)
 
 
-**Automatic Order Status Synchronisation**
+## Automatic Order Status Synchronisation
 
 ⚠️ This setting is Experimental. Monitor your Error Log after enabling this setting
 - You can enable the synchronisation of ERPNext Order Status to WooCommerce Order Status by checking the "Keep the Status of ERPNext Sales Orders and WooCommerce Orders in sync" checkbox

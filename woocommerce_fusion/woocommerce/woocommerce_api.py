@@ -60,6 +60,26 @@ class WooCommerceResource(Document):
 
 		return wc_api_list
 
+	def __getitem__(self, key):
+		"""
+		Allow for dict-like behaviour when using jsonpath-ng
+		"""
+		return self.get(key)
+
+	def __setitem__(self, key, value):
+		"""
+		Allow for dict-like behaviour when using jsonpath-ng
+		"""
+		self.set(key, value)
+
+	def __contains__(self, key):
+		"""
+		Allow for dict-like behaviour when using jsonpath-ng
+		"""
+		fields = [field.fieldname for field in self.meta.fields]
+		fields.append("name")
+		return key in fields
+
 	def init_api(self):
 		"""
 		Initialise the WooCommerce API
@@ -399,7 +419,9 @@ class WooCommerceResource(Document):
 		"""
 		Convert this Document to a dict
 		"""
-		return {field.fieldname: self.get(field.fieldname) for field in self.meta.fields}
+		doc_dict = {field.fieldname: self.get(field.fieldname) for field in self.meta.fields}
+		doc_dict["name"] = self.name  # name field is not in meta.fields
+		return doc_dict
 
 	@classmethod
 	def serialize_attributes_of_type_dict_or_list(cls, obj):

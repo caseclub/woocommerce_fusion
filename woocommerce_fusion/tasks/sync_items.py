@@ -8,6 +8,7 @@ from erpnext.stock.doctype.item.item import Item
 from frappe import _, _dict
 from frappe.query_builder import Criterion
 from frappe.utils import get_datetime, now
+from jsonpath_ng.ext import parse
 
 from woocommerce_fusion.exceptions import SyncDisabledError
 from woocommerce_fusion.tasks.sync import SynchroniseWooCommerce
@@ -290,7 +291,8 @@ class SynchroniseItem(SynchroniseWooCommerce):
 			wc_product.woocommerce_name = item.item.item_name
 			wc_product_dirty = True
 
-		if self.set_product_fields(wc_product, item):
+		product_fields_changed, wc_product = self.set_product_fields(wc_product, item)
+		if product_fields_changed:
 			wc_product_dirty = True
 
 		if wc_product_dirty:
@@ -487,21 +489,29 @@ class SynchroniseItem(SynchroniseWooCommerce):
 				"WooCommerce Server", self.woocommerce_product.woocommerce_server
 			)
 			if wc_server.item_field_map:
+				woocommerce_product_dict = (
+					self.woocommerce_product.deserialize_attributes_of_type_dict_or_list(
+						self.woocommerce_product.to_dict()
+					)
+				)
 				for map in wc_server.item_field_map:
 					erpnext_item_field_name = map.erpnext_field_name.split(" | ")
-					woocommerce_product_field_value = self.woocommerce_product.get(map.woocommerce_field_name)
+
+					# We expect woocommerce_field_name to be valid JSONPath
+					jsonpath_expr = parse(map.woocommerce_field_name)
+					woocommerce_product_field_matches = jsonpath_expr.find(woocommerce_product_dict)
 
 					frappe.db.set_value(
 						"Item",
 						self.item.item.name,
 						erpnext_item_field_name[0],
-						woocommerce_product_field_value,
+						woocommerce_product_field_matches[0].value,
 						update_modified=False,
 					)
 
 	def set_product_fields(
 		self, woocommerce_product: WooCommerceProduct, item: ERPNextItemToSync
-	) -> bool:
+	) -> Tuple[bool, WooCommerceProduct]:
 		"""
 		If there exist any Field Mappings on `WooCommerce Server`, attempt to synchronise their values from
 		ERPNext to WooCommerce
@@ -512,15 +522,47 @@ class SynchroniseItem(SynchroniseWooCommerce):
 		if item and woocommerce_product:
 			wc_server = frappe.get_cached_doc("WooCommerce Server", woocommerce_product.woocommerce_server)
 			if wc_server.item_field_map:
+
+				# Deserialize the WooCommerce Product's list and dict fields because we want to potentially perform
+				# in-place updates on the whole dict using jsonpath-ng. Use the existing class method for this.
+				wc_product_with_deserialised_fields = (
+					woocommerce_product.deserialize_attributes_of_type_dict_or_list(woocommerce_product)
+				)
+
 				for map in wc_server.item_field_map:
 					erpnext_item_field_name = map.erpnext_field_name.split(" | ")
 					erpnext_item_field_value = getattr(item.item, erpnext_item_field_name[0])
 
-					if erpnext_item_field_value != getattr(woocommerce_product, map.woocommerce_field_name):
-						setattr(woocommerce_product, map.woocommerce_field_name, erpnext_item_field_value)
+					# We expect woocommerce_field_name to be valid JSONPath
+					jsonpath_expr = parse(map.woocommerce_field_name)
+					woocommerce_product_field_matches = jsonpath_expr.find(wc_product_with_deserialised_fields)
+
+					if len(woocommerce_product_field_matches) == 0:
+						if woocommerce_product.name:
+							# We're strict about existing WooCommerce Products, the field should exist
+							raise ValueError(
+								_("Field <code>{0}</code> not found in WooCommerce Product {1}").format(
+									map.woocommerce_field_name, woocommerce_product.name
+								)
+							)
+						else:
+							# For new WooCommerce Products, the nested field may not exist yet, so don't stop the sync
+							continue
+
+					# JSONPath parsing typically returns a list, we'll only take the first value
+					woocommerce_product_field_value = woocommerce_product_field_matches[0].value
+
+					if erpnext_item_field_value != woocommerce_product_field_value:
+						jsonpath_expr.update(wc_product_with_deserialised_fields, erpnext_item_field_value)
 						wc_product_dirty = True
 
-		return wc_product_dirty
+				if wc_product_dirty:
+					# Re-serialize the WooCommerce Product's list and dict fields, because we deserialized earlier
+					woocommerce_product = woocommerce_product.serialize_attributes_of_type_dict_or_list(
+						wc_product_with_deserialised_fields
+					)
+
+		return wc_product_dirty, woocommerce_product
 
 	def set_sync_hash(self):
 		"""
