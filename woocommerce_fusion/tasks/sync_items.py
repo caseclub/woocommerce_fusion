@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 import frappe
 from erpnext.stock.doctype.item.item import Item
-from frappe import _, _dict
+from frappe import ValidationError, _, _dict
 from frappe.query_builder import Criterion
 from frappe.utils import get_datetime, now
 from jsonpath_ng.ext import parse
@@ -165,11 +165,14 @@ class SynchroniseItem(SynchroniseWooCommerce):
 			self.get_corresponding_item_or_product()
 			self.sync_wc_product_with_erpnext_item()
 		except Exception as err:
-			woocommerce_product_dict = (
-				self.woocommerce_product.as_dict()
-				if isinstance(self.woocommerce_product, WooCommerceProduct)
-				else self.woocommerce_product
-			)
+			try:
+				woocommerce_product_dict = (
+					self.woocommerce_product.as_dict()
+					if isinstance(self.woocommerce_product, WooCommerceProduct)
+					else self.woocommerce_product
+				)
+			except ValidationError as e:
+				woocommerce_product_dict = self.woocommerce_product
 			error_message = f"{frappe.get_traceback()}\n\nItem Data: \n{str(self.item) if self.item else ''}\n\nWC Product Data \n{str(woocommerce_product_dict) if self.woocommerce_product else ''})"
 			frappe.log_error("WooCommerce Error", error_message)
 			raise err
