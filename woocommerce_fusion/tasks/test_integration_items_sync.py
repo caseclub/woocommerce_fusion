@@ -44,9 +44,6 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		self.assertEqual(item.item_code, str(wc_product_id))
 		self.assertEqual(item.item_name, "SOME_ITEM")
 
-		# Expect correct custom mapped field values
-		self.assertEqual(item.description, "<p>SOME_ITEM</p>\n")
-
 	def test_sync_create_new_item_with_image_when_synchronising_with_woocommerce(
 		self, mock_log_error
 	):
@@ -83,7 +80,7 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		# Expect correct image in item
 		self.assertTrue("chrislema-hat" in item.image)
 
-	def test_sync_create_new_item_with_image_when_synchronising_with_woocommerce(
+	def test_sync_create_new_item_with_custom_metadata_when_synchronising_with_woocommerce(
 		self, mock_log_error
 	):
 		"""
@@ -126,11 +123,6 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 
 		# Expect value in mapped field in Item
 		self.assertEqual(item.description, "Test 2")
-
-		# Clean Up
-		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
-		wc_server.item_field_map = []
-		wc_server.save()
 
 	def test_sync_create_new_template_item_when_synchronising_with_woocommerce(self, mock_log_error):
 		"""
@@ -229,9 +221,6 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		# Expect correct item name in item
 		self.assertEqual(wc_product["name"], item.item_name)
 
-		# Expect correct custom mapped field values
-		self.assertEqual(wc_product["short_description"], "<p>ITEM101</p>\n")
-
 	def test_sync_create_new_variable_wc_product_when_synchronising_with_woocommerce(
 		self, mock_log_error
 	):
@@ -326,9 +315,12 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		self.assertEqual(wc_product["attributes"][0]["name"], "Material Type")
 		self.assertEqual(wc_product["attributes"][0]["option"], "Option 2")
 
-	def test_sync_create_new_wc_product_when_synchronising_with_woocommerce(self, mock_log_error):
+	def test_sync_create_new_wc_product_with_custom_fields_when_synchronising_with_woocommerce(
+		self, mock_log_error
+	):
 		"""
-		Test that the Item Synchronisation method creates a new WooCommerce product with mapped custom fields.
+		Test that the Item Synchronisation method syncs the mapped custom fields between
+		a WooCommerce product and ERPNext Item.
 		"""
 		dummy_meta_data = [{"id": 52824, "key": "_short_description_1", "value": "Test 1"}]
 		# Setup
@@ -368,10 +360,18 @@ class TestIntegrationWooCommerceItemsSync(TestIntegrationWooCommerce):
 		self.assertEqual(wc_product["meta_data"][0]["key"], "_short_description_1")
 		self.assertEqual(wc_product["meta_data"][0]["value"], "Description from ERPNext")
 
-		# Clean Up
-		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
-		wc_server.item_field_map = []
-		wc_server.save()
+		# Now we update the WooCommerce meta data and sync again
+		new_meta_data = [
+			{"id": 52824, "key": "_short_description_1", "value": "Final description from WooCommerce"}
+		]
+		self.update_woocommerce_product_metadata(wc_product["id"], new_meta_data)
+		run_item_sync(item_code=item.name)
+
+		# Get the updated item
+		item.reload()
+
+		# Expect correct custom mapped field values
+		self.assertEqual(item.description, "Final description from WooCommerce")
 
 	def test_sync_create_new_variable_wc_product_when_synchronising_with_woocommerce(
 		self, mock_log_error

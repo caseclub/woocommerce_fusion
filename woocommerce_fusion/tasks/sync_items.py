@@ -33,7 +33,7 @@ def run_item_sync_from_hook(doc, method):
 		and len(doc.woocommerce_servers) > 0
 	):
 		frappe.msgprint(
-			_("Background sync to WooCommerce triggered for {}").format(frappe.bold(doc.name)),
+			_("Background sync to WooCommerce triggered for {0} {1}").format(frappe.bold(doc.name), method),
 			indicator="blue",
 			alert=True,
 		)
@@ -263,18 +263,24 @@ class SynchroniseItem(SynchroniseWooCommerce):
 		"""
 		Update the ERPNext Item with fields from it's corresponding WooCommerce Product
 		"""
+		item_dirty = False
 		if item.item.item_name != woocommerce_product.woocommerce_name:
 			item.item.item_name = woocommerce_product.woocommerce_name
-			item.item.flags.created_by_sync = True
-			item.item.save()
-		self.set_item_fields()
+			item_dirty = True
+
+		fields_updated, item.item = self.set_item_fields(item=item.item)
 
 		wc_server = frappe.get_cached_doc("WooCommerce Server", woocommerce_product.woocommerce_server)
 		if wc_server.enable_image_sync:
 			wc_product_images = json.loads(woocommerce_product.images)
 			if len(wc_product_images) > 0:
-				if item.image != wc_product_images[0]["src"]:
-					item.image = wc_product_images[0]["src"]
+				if item.item.image != wc_product_images[0]["src"]:
+					item.item.image = wc_product_images[0]["src"]
+					item_dirty = True
+
+		if item_dirty or fields_updated:
+			item.item.flags.created_by_sync = True
+			item.item.save()
 
 		self.set_sync_hash()
 
@@ -424,6 +430,9 @@ class SynchroniseItem(SynchroniseWooCommerce):
 			if len(wc_product_images) > 0:
 				item.image = wc_product_images[0]["src"]
 
+		modified, item = self.set_item_fields(item=item)
+		item.flags.created_by_sync = True
+
 		item.insert()
 
 		self.item = ERPNextItemToSync(
@@ -434,8 +443,6 @@ class SynchroniseItem(SynchroniseWooCommerce):
 				if iws.woocommerce_server == wc_product.woocommerce_server
 			),
 		)
-
-		self.set_item_fields()
 
 		self.set_sync_hash()
 
@@ -479,12 +486,13 @@ class SynchroniseItem(SynchroniseWooCommerce):
 				else:
 					item_attribute.save()
 
-	def set_item_fields(self):
+	def set_item_fields(self, item: Item) -> Tuple[bool, Item]:
 		"""
 		If there exist any Field Mappings on `WooCommerce Server`, attempt to synchronise their values from
 		WooCommerce to ERPNext
 		"""
-		if self.item and self.woocommerce_product:
+		item_dirty = False
+		if item and self.woocommerce_product:
 			wc_server = frappe.get_cached_doc(
 				"WooCommerce Server", self.woocommerce_product.woocommerce_server
 			)
@@ -501,13 +509,9 @@ class SynchroniseItem(SynchroniseWooCommerce):
 					jsonpath_expr = parse(map.woocommerce_field_name)
 					woocommerce_product_field_matches = jsonpath_expr.find(woocommerce_product_dict)
 
-					frappe.db.set_value(
-						"Item",
-						self.item.item.name,
-						erpnext_item_field_name[0],
-						woocommerce_product_field_matches[0].value,
-						update_modified=False,
-					)
+					setattr(item, erpnext_item_field_name[0], woocommerce_product_field_matches[0].value)
+					item_dirty = True
+		return item_dirty, item
 
 	def set_product_fields(
 		self, woocommerce_product: WooCommerceProduct, item: ERPNextItemToSync
