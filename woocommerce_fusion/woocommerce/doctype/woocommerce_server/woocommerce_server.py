@@ -55,7 +55,12 @@ class WooCommerceServer(Document):
 		"""
 		Validate Item Map to have valid JSONPath expressions
 		"""
-		disallowed_fields = ["attributes", "images"]
+		disallowed_fields = ["attributes"]
+
+		# If the built-in image sync is enabled, disallow the image field in the item field map to avoid unexpected behavior
+		if self.enable_image_sync:
+			disallowed_fields.append("images")
+
 		if self.item_field_map:
 			for map in self.item_field_map:
 				jsonpath_expr = map.woocommerce_field_name

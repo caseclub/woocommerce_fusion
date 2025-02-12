@@ -70,9 +70,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		row = wc_server.append("warehouses")
 		row.warehouse = "Stores - SC"
 
-		row = wc_server.append("item_field_map")
-		row.erpnext_field_name = "description | Description"
-		row.woocommerce_field_name = "short_description"
+		wc_server.item_field_map = []
 
 		wc_server.save()
 		self.wc_server = wc_server
