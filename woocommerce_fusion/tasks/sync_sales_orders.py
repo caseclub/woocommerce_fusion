@@ -8,7 +8,7 @@ from frappe import _
 from frappe.utils import get_datetime
 from frappe.utils.data import cstr, now
 
-from woocommerce_fusion.exceptions import SyncDisabledError
+from woocommerce_fusion.exceptions import SyncDisabledError, WooCommerceOrderNotFoundError
 from woocommerce_fusion.tasks.sync import SynchroniseWooCommerce
 from woocommerce_fusion.tasks.sync_items import run_item_sync
 from woocommerce_fusion.woocommerce.doctype.woocommerce_order.woocommerce_order import (
@@ -146,6 +146,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 		"""
 		If we have an ERPNext Sales Order, get the corresponding WooCommerce Order
 		If we have a WooCommerce Order, get the corresponding ERPNext Sales Order
+
+		Assumes that both exist, and that the Sales Order is linked to the WooCommerce Order
 		"""
 		if self.sales_order and not self.woocommerce_order and self.sales_order.woocommerce_id:
 			# Validate that this Sales Order's WooCommerce Server has sync enabled
@@ -154,6 +156,11 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				raise SyncDisabledError(wc_server)
 
 			wc_orders = get_list_of_wc_orders(sales_order=self.sales_order)
+
+			# If we can't find a linked WooCommerce Order (it may have been deleted), we can't proceed
+			if len(wc_orders) == 0:
+				raise WooCommerceOrderNotFoundError(self.sales_order)
+
 			self.woocommerce_order = wc_orders[0]
 
 		if self.woocommerce_order and not self.sales_order:
