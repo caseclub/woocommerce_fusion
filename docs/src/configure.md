@@ -26,12 +26,23 @@ When set, adding/removing/changing Sales Order **Lines** will be synchronised ba
 - Enable Payments Sync
 
 Let the app create Payment Entries for paid Sales Orders. A mapping of Payment Method to Bank Account is required:
+
+A **Payment Entry** will only be created if the following conditions are true:
+
+- `WooCommerce Order` > `Payment Method` is set 
+**and**
+- `WooCommerce Order` > `Date Paid` is set (unless `Ignore empty 'Date Paid' field on WooCommerce Orders` is set on `WooCommerce Server`
+
+*When the payment method is "Cash on Delivery" (cod), the `Date Paid` field would usually be blank, so creation of a *Payment Entry* won't happen. If you want to be sure, you can add `cod` in the mapping:
+
 ```json
 {
    "bacs": "1000-000 Bank Account",
-   "cheque": "1000-100 Other Bank Account"
+   "cheque": "1000-100 Other Bank Account",
+   "cod": ""
 }
 ```
+
 ---
 
 Click on the "Items" tab if you want to turn on Stock Level Synchronisation
