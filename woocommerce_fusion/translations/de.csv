@@ -267,3 +267,5 @@ Invalid JSONPath syntax in Item Field Map Row {0}:<br><br><pre>{1}</pre>,Ungült
 Field '{0}' is not allowed in JSONPath expression,Feld '{0}' ist nicht in JSONPath-Ausdruck erlaubt,
 Field <code>{0}</code> not found in WooCommerce Product {1},Feld <code>{0}</code> nicht in WooCommerce-Produkt {1} gefunden,
 Background sync to WooCommerce triggered for {0} {1},Hintergrund-Synchronisierung zu WooCommerce ausgelöst für {0} {1},
+Enable Dual Accounts for Same Email (Private/Company),Doppelte Konten für dieselbe E-Mail (Privat/Firma) aktivieren,
+If two WooCommerce Customer records share the same email address but one is a Company they will be treated as separate entries,Wenn zwei WooCommerce-Kunden-Datensätze dieselbe E-Mail-Adresse teilen aber einer ein Unternehmen ist werden

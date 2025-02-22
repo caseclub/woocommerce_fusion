@@ -4,6 +4,7 @@ import frappe
 from erpnext import get_default_company
 from erpnext.selling.doctype.sales_order.sales_order import update_status
 from erpnext.stock.doctype.item.test_item import create_item
+from parameterized import parameterized
 
 from woocommerce_fusion.tasks.sync_sales_orders import (
 	get_addresses_linking_to,
@@ -27,11 +28,10 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self, wc_server, rate: float, included_in_rate: bool = False
 	) -> str:
 		taxes_and_charges_template = None
-		if frappe.db.exists(
-			"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
-		):
+		title = f"_Test Sales Taxes and Charges Template for Woo {rate}-{included_in_rate}"
+		if frappe.db.exists("Sales Taxes and Charges Template", {"title": title}):
 			taxes_and_charges_template = frappe.get_doc(
-				"Sales Taxes and Charges Template", {"title": "_Test Sales Taxes and Charges Template for Woo"}
+				"Sales Taxes and Charges Template", {"title": title}
 			)
 		else:
 			taxes_and_charges_template = frappe.get_doc(
@@ -49,7 +49,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 							"included_in_print_rate": included_in_rate,
 						}
 					],
-					"title": "_Test Sales Taxes and Charges Template for Woo",
+					"title": title,
 				}
 			).insert()
 		return taxes_and_charges_template.name
@@ -133,21 +133,33 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
+	@parameterized.expand([(True, 50, 13.04, 26.08, 100), (False, 43.48, 13.04, 26.08, 100)])
 	def test_sync_create_new_sales_order_with_tax_template_and_shipping_when_synchronising_with_woocommerce(
-		self, mock_log_error
+		self,
+		mock_log_error,
+		included_in_rate,
+		expected_item_rate,
+		expected_tax_amount,
+		expected_base_tax_amount,
+		expected_total_amount,
 	):
 		"""
 		Test that the Sales Order Synchronisation method creates a new Sales order with a Tax Template
-		for a new WooCommerce order and a Sales Taxes and Charges template has been set in settings.
+		for a new WooCommerce order when a Sales Taxes and Charges template is set.
 
 		Assumes that the Wordpress Site we're testing against has:
-		- Tax enabled
+		- Tax enabled, at a rate of 15%
 		- Sales prices include tax
+
+		Parameterisation: (included_in_rate, expected item.rate, expected tax_amount, expected total_tax_amount)
+		1. Tax Template that includes tax so Item Rate should include Tax (=50), and tax should be 50 x 2 x 15/115 = 13.04
+		2. Tax Template that excludes tax so Item Rate should exclude Tax (=43.48), and tax should be 50 x 2 x 15/115 = 13.04
+
 		"""
 		# Setup
 		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
 		template_name = self._create_sales_taxes_and_charges_template(
-			wc_server, rate=15, included_in_rate=1
+			wc_server, rate=15, included_in_rate=included_in_rate
 		)
 		wc_server.use_actual_tax_type = 0
 		wc_server.sales_taxes_and_charges_template = template_name
@@ -157,7 +169,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 
 		# Create a new order in WooCommerce
 		wc_order_id, wc_order_name = self.post_woocommerce_order(
-			payment_method_title="Doge", item_price=10, item_qty=2, shipping_method_id="flat_rate"
+			payment_method_title="Doge", item_price=50, item_qty=2, shipping_method_id="flat_rate"
 		)
 
 		# Run synchronisation
@@ -175,14 +187,17 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.assertEqual(sales_order.woocommerce_payment_method, "Doge")
 
 		# Expect correct items in Sales Order
-		self.assertEqual(sales_order.items[0].rate, 10)  # should show tax inclusive price
+		self.assertEqual(
+			sales_order.items[0].rate, expected_item_rate
+		)  # should show tax inclusive price
 		self.assertEqual(sales_order.items[0].qty, 2)
 
 		# Expect correct tax rows in Sales Order
 		self.assertEqual(sales_order.taxes[0].charge_type, "On Net Total")
 		self.assertEqual(sales_order.taxes[0].rate, 15)
-		self.assertEqual(sales_order.taxes[0].tax_amount, 2.61)  # 20 x 15/115 = 2.61
-		self.assertEqual(sales_order.taxes[0].total, 20)
+		self.assertEqual(sales_order.taxes[0].tax_amount, expected_tax_amount)
+		self.assertEqual(sales_order.taxes[0].base_tax_amount, expected_base_tax_amount)
+		self.assertEqual(sales_order.taxes[0].total, expected_total_amount)
 		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
 
 		# Expect correct tax rows in Sales Order

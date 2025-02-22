@@ -8,7 +8,7 @@ from frappe import _
 from frappe.utils import get_datetime
 from frappe.utils.data import cstr, now
 
-from woocommerce_fusion.exceptions import SyncDisabledError
+from woocommerce_fusion.exceptions import SyncDisabledError, WooCommerceOrderNotFoundError
 from woocommerce_fusion.tasks.sync import SynchroniseWooCommerce
 from woocommerce_fusion.tasks.sync_items import run_item_sync
 from woocommerce_fusion.woocommerce.doctype.woocommerce_order.woocommerce_order import (
@@ -146,6 +146,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 		"""
 		If we have an ERPNext Sales Order, get the corresponding WooCommerce Order
 		If we have a WooCommerce Order, get the corresponding ERPNext Sales Order
+
+		Assumes that both exist, and that the Sales Order is linked to the WooCommerce Order
 		"""
 		if self.sales_order and not self.woocommerce_order and self.sales_order.woocommerce_id:
 			# Validate that this Sales Order's WooCommerce Server has sync enabled
@@ -154,6 +156,11 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				raise SyncDisabledError(wc_server)
 
 			wc_orders = get_list_of_wc_orders(sales_order=self.sales_order)
+
+			# If we can't find a linked WooCommerce Order (it may have been deleted), we can't proceed
+			if len(wc_orders) == 0:
+				raise WooCommerceOrderNotFoundError(self.sales_order)
+
 			self.woocommerce_order = wc_orders[0]
 
 		if self.woocommerce_order and not self.sales_order:
@@ -500,9 +507,10 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			return None
 
 		# Use order ID for guest users, otherwise use email
+		wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
 		if is_guest:
 			customer_identifier = f"Guest-{order_id}"
-		elif company_name:
+		elif company_name and wc_server.enable_dual_accounts:
 			customer_identifier = f"{customer_woo_com_email}-{company_name}"
 		else:
 			customer_identifier = customer_woo_com_email
@@ -536,10 +544,11 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
 		try:
 			customer.save()
-			self.customer = customer
 		except Exception:
 			error_message = f"{frappe.get_traceback()}\n\nCustomer Data{str(customer.as_dict())}"
 			frappe.log_error("WooCommerce Error", error_message)
+		finally:
+			self.customer = customer
 
 		self.create_or_update_address(wc_order)
 		contact = create_contact(raw_billing_data, self.customer)
@@ -600,6 +609,14 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
 				found_item = frappe.get_doc("Item", item_codes[0].parent) if item_codes else None
 
+			# If we are applying a Sales Taxes and Charges Template (as opposed to Actual Tax), then we need to
+			# determine if the item price should include tax or not
+			if not wc_server.use_actual_tax_type:
+				tax_template = frappe.get_cached_doc(
+					"Sales Taxes and Charges Template", wc_server.sales_taxes_and_charges_template
+				)
+
+			wc_server.sales_taxes_and_charges_template
 			new_sales_order.append(
 				"items",
 				{
@@ -609,7 +626,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 					"delivery_date": new_sales_order.delivery_date,
 					"qty": item.get("quantity"),
 					"rate": item.get("price")
-					if wc_server.use_actual_tax_type
+					if wc_server.use_actual_tax_type or not tax_template.taxes[0].included_in_print_rate
 					else get_tax_inc_price_for_woocommerce_line_item(item),
 					"warehouse": wc_server.warehouse,
 					"discount_percentage": 100 if item.get("price") == 0 else 0,

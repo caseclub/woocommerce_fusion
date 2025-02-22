@@ -52,11 +52,11 @@ Note that if sync for an **Item** is disabled (i.e. the "Enabled" checkbox on th
 
 Each **Customer** record has a `woocommerce_identifier` custom field. This identifier is set depending on if the **WooCommerce Order** is from a guest or not:
 
-| Case                                                               | `woocommerce_identifier`    |
-| ------------------------------------------------------------------ | --------------------------- |
-| Guest (`customer_id` on **WooCommerce Order** is empty or 0)       | `Guest-{order_id}`          |
-| Company (`billing.company` on **WooCommerce Order** is set)        | `{billing.email}-{company}` |
-| Individual (`billing.company` on **WooCommerce Order** is not set) | `billing.email`             |
+| Case                                                                                                                                        | `woocommerce_identifier`    |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Guest (`customer_id` on **WooCommerce Order** is empty or 0)                                                                                | `Guest-{order_id}`          |
+| Company (`billing.company` on **WooCommerce Order** is set), **Only if *Enable Dual Accounts for Same Email (Private/Company)* is checked** | `{billing.email}-{company}` |
+| Individual (`billing.company` on **WooCommerce Order** is not set)                                                                          | `billing.email`             |
 
 ## Address Synchronisation
 - If the billing and shipping address on the **WooCommerce Order** is the same, a single **Address** will be created with both the *Preferred Billing Address* and *Preferred Shipping Address* checkboxes ticked.
