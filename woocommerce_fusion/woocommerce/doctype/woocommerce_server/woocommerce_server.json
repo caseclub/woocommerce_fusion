@@ -45,6 +45,8 @@
   "ignore_date_paid",
   "payment_method_bank_account_mapping",
   "payment_method_gl_account_mapping",
+  "customers_sync_section",
+  "enable_dual_accounts",
   "section_addresses",
   "address_title_convention",
   "shipping_methods_sync_section",
@@ -488,11 +490,23 @@
    "fieldname": "enable_image_sync",
    "fieldtype": "Check",
    "label": "Enable Image Sync"
+  },
+  {
+   "fieldname": "customers_sync_section",
+   "fieldtype": "Section Break",
+   "label": "Customers Sync"
+  },
+  {
+   "default": "0",
+   "description": "If two WooCommerce Customer records share the same email address but one is a Company they will be treated as separate entries",
+   "fieldname": "enable_dual_accounts",
+   "fieldtype": "Check",
+   "label": "Enable Dual Accounts for Same Email (Private/Company)"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-08 14:41:23.773997",
+ "modified": "2025-02-22 11:48:11.754510",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",

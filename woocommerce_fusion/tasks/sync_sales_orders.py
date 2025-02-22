@@ -500,9 +500,10 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			return None
 
 		# Use order ID for guest users, otherwise use email
+		wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
 		if is_guest:
 			customer_identifier = f"Guest-{order_id}"
-		elif company_name:
+		elif company_name and wc_server.enable_dual_accounts:
 			customer_identifier = f"{customer_woo_com_email}-{company_name}"
 		else:
 			customer_identifier = customer_woo_com_email
