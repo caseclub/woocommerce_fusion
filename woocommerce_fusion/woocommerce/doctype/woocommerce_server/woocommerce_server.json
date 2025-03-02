@@ -63,6 +63,7 @@
   "item_stock_section",
   "enable_stock_level_synchronisation",
   "warehouses",
+  "subtract_reserved_stock",
   "item_fields_section",
   "item_fields_warning_html",
   "item_field_map",
@@ -502,11 +503,19 @@
    "fieldname": "enable_dual_accounts",
    "fieldtype": "Check",
    "label": "Enable Dual Accounts for Same Email (Private/Company)"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.enable_stock_level_synchronisation",
+   "description": "Adjusts stock levels sent to WooCommerce by subtracting reserved stock, ensuring only available stock is synced",
+   "fieldname": "subtract_reserved_stock",
+   "fieldtype": "Check",
+   "label": "Reserved Stock Adjustment"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-22 11:48:11.754510",
+ "modified": "2025-03-02 12:12:53.464419",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
