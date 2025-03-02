@@ -39,6 +39,7 @@ class WooCommerceServer(Document):
 
 		self.validate_so_status_map()
 		self.validate_item_map()
+		self.validate_reserved_stock_setting()
 
 	def validate_so_status_map(self):
 		"""
@@ -76,6 +77,18 @@ class WooCommerceServer(Document):
 				for field in disallowed_fields:
 					if field in jsonpath_expr:
 						frappe.throw(_("Field '{0}' is not allowed in JSONPath expression").format(field))
+
+	def validate_reserved_stock_setting(self):
+		"""
+		If 'Reserved Stock Adjustment' is enabled, make sure that 'Reserve Stock' in ERPNext is enabled
+		"""
+		if self.subtract_reserved_stock:
+			if not frappe.db.get_single_value("Stock Settings", "enable_stock_reservation"):
+				frappe.throw(
+					_(
+						"In order to enable 'Reserved Stock Adjustment', please enable 'Enable Stock Reservation' in 'ERPNext > Stock Settings > Stock Reservation'"
+					)
+				)
 
 	def get_shipment_providers(self):
 		"""

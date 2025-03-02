@@ -269,3 +269,6 @@ Field <code>{0}</code> not found in WooCommerce Product {1},Feld <code>{0}</code
 Background sync to WooCommerce triggered for {0} {1},Hintergrund-Synchronisierung zu WooCommerce ausgelöst für {0} {1},
 Enable Dual Accounts for Same Email (Private/Company),Doppelte Konten für dieselbe E-Mail (Privat/Firma) aktivieren,
 If two WooCommerce Customer records share the same email address but one is a Company they will be treated as separate entries,Wenn zwei WooCommerce-Kunden-Datensätze dieselbe E-Mail-Adresse teilen aber einer ein Unternehmen ist werden
+Reserved Stock Adjustment,Reservierter Bestandsausgleich,
+Adjusts stock levels sent to WooCommerce by subtracting reserved stock ensuring only available stock is synced,Passt die an WooCommerce gesendeten Lagerbestände an indem reservierte Lagerbestände abgezogen werden um sicherzustellen dass nur verfügbare Lagerbestände synchronisiert werden
+In order to enable 'Reserved Stock Adjustment' please enable 'Enable Stock Reservation' in 'ERPNext > Stock Settings > Stock Reservation',Um die 'Reservierter Bestandsausgleich' zu aktivieren aktivieren Sie bitte 'Bestandsreservierung aktivieren' in 'ERPNext > Lager-Einstellungen > Bestandsreservierung',

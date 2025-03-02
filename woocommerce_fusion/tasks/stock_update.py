@@ -102,6 +102,8 @@ def update_stock_levels_on_woocommerce_site(item_code):
 					"stock_quantity": math.floor(
 						sum(
 							bin.actual_qty
+							if not wc_server.subtract_reserved_stock
+							else bin.actual_qty - bin.reserved_qty
 							for bin in bins
 							if bin.warehouse in [row.warehouse for row in wc_server.warehouses]
 						)
