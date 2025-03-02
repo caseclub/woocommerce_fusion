@@ -642,13 +642,16 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				ordered_items_tax = item.get("total_tax")
 				add_tax_details(new_sales_order, ordered_items_tax, "Ordered Item tax", wc_server.tax_account)
 
-		add_tax_details(new_sales_order, wc_order.shipping_tax, "Shipping Tax", wc_server.f_n_f_account)
-		add_tax_details(
-			new_sales_order,
-			wc_order.shipping_total,
-			"Shipping Total",
-			wc_server.f_n_f_account,
-		)
+		# If a Shipping Rule is added, shipping charges will be determined by the Shipping Rule. If not, then
+		# get it from the WooCommerce Order
+		if not new_sales_order.shipping_rule:
+			add_tax_details(new_sales_order, wc_order.shipping_tax, "Shipping Tax", wc_server.f_n_f_account)
+			add_tax_details(
+				new_sales_order,
+				wc_order.shipping_total,
+				"Shipping Total",
+				wc_server.f_n_f_account,
+			)
 
 		# Handle scenario where Woo Order has no items, then manually set the total
 		if len(new_sales_order.items) == 0:

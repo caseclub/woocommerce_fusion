@@ -54,7 +54,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 			).insert()
 		return taxes_and_charges_template.name
 
-	def test_sync_create_new_sales_order_when_synchronising_with_woocommerce(self, mock_log_error):
+	def test_sync_create_new_sales_order(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method creates a new Sales order when there is a new
 		WooCommerce order.
@@ -99,9 +99,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_sales_order_in_usd_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
+	def test_sync_create_new_sales_order_in_usd(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method creates a new Sales order in the correct currency
 		when currency is different from base currency
@@ -134,7 +132,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
 	@parameterized.expand([(True, 50, 13.04, 26.08, 100), (False, 43.48, 13.04, 26.08, 100)])
-	def test_sync_create_new_sales_order_with_tax_template_and_shipping_when_synchronising_with_woocommerce(
+	def test_sync_create_new_sales_order_with_tax_template_and_shipping(
 		self,
 		mock_log_error,
 		included_in_rate,
@@ -207,9 +205,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_sales_order_and_pe_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
+	def test_sync_create_new_sales_order_and_pe(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method creates a new Sales orders and a Payment Entry
 		when there is a new fully paid WooCommerce orders.
@@ -230,9 +226,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_draft_sales_order_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
+	def test_sync_create_new_draft_sales_order(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method creates a new Draft Sales order without errors
 		when the submit_sales_orders setting is set to 0
@@ -264,9 +258,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_link_payment_entry_after_so_submitted_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
+	def test_sync_link_payment_entry_after_so_submitted(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method creates a linked Payment Entry if there are no linked
 		PE's on a now-submitted Sales Order
@@ -304,7 +296,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_updates_woocommerce_order_when_synchronising_with_woocommerce(self, mock_log_error):
+	def test_sync_updates_woocommerce_order(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method updates a WooCommerce Order
 		with changed fields from Sales Order
@@ -374,9 +366,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_uses_dummy_item_for_deleted_item_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
+	def test_sync_uses_dummy_item_for_deleted_item(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method uses a placeholder item when
 		synchronising with a WooCommerce Order that has a deleted item
@@ -482,7 +472,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.delete_woocommerce_order(wc_order_id=wc_order_id_first)
 		self.delete_woocommerce_order(wc_order_id=wc_order_id_second)
 
-	def test_sync_links_shipping_rule_when_synchronising_with_woocommerce(self, mock_log_error):
+	def test_sync_links_shipping_rule(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method links a Shipping Rule on the created
 		Sales order when Shipping Rule Sync is enabled and a mapping exists.
@@ -523,10 +513,66 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
+	def test_sync_with_shipping_rule_and_tax_template(self, mock_log_error):
+		"""
+		Test that the Sales Order Synchronisation method links a Shipping Rule on the created
+		Sales order when Shipping Rule Sync is enabled and a mapping exists, and handles
+		a Sales Tax Templates at the same without duplicating shipping charges
+		"""
+		# Setup: Create a Shipping Rule
+		sr = create_shipping_rule(shipping_rule_type="Selling", shipping_rule_name="Woo Shipping")
+
+		# Setup: Map WooCommerce Shipping Method to ERPNext Shipping Rule
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.enable_shipping_methods_sync = 1
+		wc_server.shipping_rule_map = []
+		wc_server.append(
+			"shipping_rule_map",
+			{"wc_shipping_method_id": "flat_rate", "shipping_rule": sr.name},
+		)
+
+		# Setup: Tax Template
+		template_name = self._create_sales_taxes_and_charges_template(
+			wc_server, rate=15, included_in_rate=False
+		)
+		wc_server.use_actual_tax_type = 0
+		wc_server.sales_taxes_and_charges_template = template_name
+		wc_server.flags.ignore_mandatory = True
+		wc_server.save()
+
+		# Create a new order in WooCommerce
+		wc_order_id, wc_order_name = self.post_woocommerce_order(
+			payment_method_title="Doge", item_price=10, item_qty=1, shipping_method_id="flat_rate"
+		)
+
+		# Run synchronisation
+		run_sales_order_sync(woocommerce_order_name=wc_order_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Sales Order in ERPNext
+		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id}, "name")
+		self.assertIsNotNone(sales_order_name)
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+
+		# Expect correct Shipping Rule on Sales Order
+		self.assertEqual(sales_order.shipping_rule, sr.name)
+
+		# Expect correct tax rows in Sales Order
+		self.assertEqual(sales_order.taxes[0].charge_type, "On Net Total")
+		self.assertEqual(sales_order.taxes[0].rate, 15)
+		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
+
+		# Expect two charge rows in Sales Order, the first is the VAT tax row, and the second the 'Woo Shipping' row from the Shipping Rule
+		self.assertEqual(len(sales_order.taxes), 2)
+		self.assertEqual(sales_order.taxes[1].description, "Woo Shipping")
+
+		# Delete order in WooCommerce
+		self.delete_woocommerce_order(wc_order_id=wc_order_id)
+
 	@patch("woocommerce_fusion.tasks.sync_sales_orders.frappe.enqueue")
-	def test_sync_updates_woocommerce_order_status_when_synchronising_with_woocommerce(
-		self, mock_enqueue, mock_log_error
-	):
+	def test_sync_updates_woocommerce_order_status(self, mock_enqueue, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method updates a WooCommerce Order's status
 		with the correct mapped value if auto status sync is enabled
@@ -578,9 +624,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
 	@patch("woocommerce_fusion.tasks.sync_sales_orders.frappe.enqueue")
-	def test_sync_updates_woocommerce_order_status_when_synchronising_with_woocommerce(
-		self, mock_enqueue, mock_log_error
-	):
+	def test_sync_updates_woocommerce_order_status(self, mock_enqueue, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method updates a WooCommerce Order's status
 		with the correct mapped value if auto status sync is enabled
@@ -631,9 +675,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_sales_order_with_coupons_when_synchronising_with_woocommerce(
-		self, mock_log_error
-	):
+	def test_sync_create_new_sales_order_with_coupons(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method creates a new Sales order when there is a new
 		WooCommerce order, and that coupons are taken into account
