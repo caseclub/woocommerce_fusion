@@ -258,3 +258,7 @@ fixtures = [
 		],
 	}
 ]
+
+default_log_clearing_doctypes = {
+	"WooCommerce Request Log": 7,
+}
