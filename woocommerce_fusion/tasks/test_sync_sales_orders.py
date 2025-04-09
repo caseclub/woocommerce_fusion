@@ -374,6 +374,54 @@ class TestWooCommerceSync(FrappeTestCase):
 
 		mock_create_address.assert_has_calls(expected_calls)
 
+	@patch("woocommerce_fusion.tasks.sync_sales_orders.frappe.new_doc")
+	@patch("woocommerce_fusion.tasks.sync_sales_orders.frappe.log_error")
+	def test_no_payment_entry_created_when_total_is_zero(
+		self, mock_log_error, mock_frappe_new_doc, mock_get_wc_servers
+	):
+		"""
+		Test that no payment entry is created when the WooCommerce order total is 0
+		"""
+		# Initialise class
+		sync = SynchroniseSalesOrder()
+
+		# Arrange
+		wc_order = frappe._dict(
+			{
+				"payment_method": "PayPal",
+				"date_paid": "2023-01-01",
+				"name": "wc_order_1",
+				"payment_method_title": "PayPal",
+				"total": 0,
+				"id": "123",
+			}
+		)
+
+		mock_sales_order = frappe._dict(
+			woocommerce_server="example.com",
+			woocommerce_payment_entry=None,
+			customer="customer_1",
+			grand_total=0,
+			name="SO-0001",
+			docstatus=1,
+			per_billed=0,
+		)
+
+		mock_get_wc_servers.return_value = frappe._dict(
+			enable_payments_sync=1,
+			woocommerce_server_url="http://example.com",
+			payment_method_bank_account_mapping=json.dumps({"PayPal": "Bank Account"}),
+			payment_method_gl_account_mapping=json.dumps({"PayPal": "GL Account"}),
+		)
+
+		# Act
+		result = sync.create_and_link_payment_entry(wc_order, mock_sales_order)
+
+		# Assert
+		self.assertTrue(result)
+		self.assertIsNone(mock_sales_order.woocommerce_payment_entry)
+		mock_frappe_new_doc.assert_not_called()
+
 
 def create_bank_account(
 	bank_name=default_bank, account_name="_Test Bank", company=default_company
