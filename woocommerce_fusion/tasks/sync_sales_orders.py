@@ -281,6 +281,10 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			and not sales_order.woocommerce_payment_entry
 			and sales_order.docstatus == 1
 		):
+			# If the grand total is 0, skip payment entry creation
+			if sales_order.grand_total == None or float(sales_order.grand_total) == 0:
+				return True
+
 			# Get Company Bank Account for this Payment Method
 			payment_method_bank_account_mapping = json.loads(wc_server.payment_method_bank_account_mapping)
 
