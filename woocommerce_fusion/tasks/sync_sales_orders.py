@@ -434,6 +434,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 		self.create_missing_items(wc_order, json.loads(wc_order.line_items), wc_order.woocommerce_server)
 
 		new_sales_order = frappe.new_doc("Sales Order")
+		self.sales_order = new_sales_order
 		new_sales_order.customer = customer_docname
 		new_sales_order.po_no = new_sales_order.woocommerce_id = wc_order.id
 		new_sales_order.custom_woocommerce_customer_note = wc_order.customer_note
