@@ -75,7 +75,9 @@
   "tab_plugins",
   "advanced_shipment_tracking_section",
   "wc_plugin_advanced_shipment_tracking",
-  "wc_ast_shipment_providers"
+  "wc_ast_shipment_providers",
+  "tab_logs",
+  "enable_woocommerce_request_logs"
  ],
  "fields": [
   {
@@ -511,11 +513,24 @@
    "fieldname": "subtract_reserved_stock",
    "fieldtype": "Check",
    "label": "Reserved Stock Adjustment"
+  },
+  {
+   "fieldname": "tab_logs",
+   "fieldtype": "Tab Break",
+   "label": "Logs"
+  },
+  {
+   "default": "0",
+   "description": "Log every request to your WooCommerce Server",
+   "fieldname": "enable_woocommerce_request_logs",
+   "fieldtype": "Check",
+   "label": "Enable WooCommerce Request Logs"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-03-02 12:12:53.464419",
+ "modified": "2025-05-04 16:44:09.285315",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
@@ -579,6 +594,7 @@
    "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
