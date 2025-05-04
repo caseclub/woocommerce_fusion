@@ -12,7 +12,6 @@
   "status",
   "time_elapsed",
   "data",
-  "traceback",
   "column_break_tkth5",
   "url",
   "method",
@@ -92,23 +91,17 @@
    "read_only": 1
   },
   {
-   "fieldname": "traceback",
-   "fieldtype": "Code",
-   "label": "Traceback",
-   "options": "JSON",
-   "read_only": 1
-  },
-  {
    "fieldname": "time_elapsed",
    "fieldtype": "Duration",
    "label": "Time Elapsed",
    "read_only": 1
   }
  ],
+ "grid_page_length": 50,
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-01 07:59:57.449832",
+ "modified": "2025-05-04 16:39:42.630595",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Request Log",
@@ -128,6 +121,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

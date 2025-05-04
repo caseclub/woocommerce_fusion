@@ -61,7 +61,6 @@ def log_woocommerce_request(
 			"response": f"{str(res)}\n{res.text}" if res is not None else None,
 			"error": frappe.get_traceback(),
 			"status": "Success" if res and res.status_code in [200, 201] else "Error",
-			"traceback": traceback,
 			"time_elapsed": res.elapsed.total_seconds() if res is not None else None,
 		}
 	)
