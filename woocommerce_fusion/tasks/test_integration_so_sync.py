@@ -675,7 +675,56 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
-	def test_sync_create_new_sales_order_with_coupons(self, mock_log_error):
+	def test_sync_so_items_to_wc_preserves_metadata(self, mock_log_error):
+		"""
+		Test that when 'sync_so_items_to_wc' is enabled, changes to ERPNext Sales Order
+		are synced to WooCommerce Order while preserving metadata on the WooCommerce Order Line Items.
+		"""
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.sync_so_items_to_wc = 1
+		wc_server.submit_sales_orders = 0
+		wc_server.flags.ignore_mandatory = True
+		wc_server.save()
+
+		# Create a new order in WooCommerce with metadata
+		wc_order_id, wc_order_name = self.post_woocommerce_order(
+			payment_method_title="Doge",
+			item_price=10,
+			item_qty=1,
+			line_item_metadata=[{"key": "custom_field", "value": "custom_value"}],
+		)
+
+		# Run synchronisation for the ERPNext Sales Order to be created
+		run_sales_order_sync(woocommerce_order_name=wc_order_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Sales Order in ERPNext
+		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id}, "name")
+		self.assertIsNotNone(sales_order_name)
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+
+		# Change quantity of the item in ERPNext Sales Order
+		sales_order.items[0].qty = 2
+		sales_order.save()
+		sales_order.submit()
+
+		# Run synchronisation again, to sync the Sales Order changes
+		run_sales_order_sync(sales_order_name=sales_order.name)
+		mock_log_error.assert_not_called()
+
+		# Expect WooCommerce Order to have updated items and preserved metadata
+		wc_order = self.get_woocommerce_order(order_id=wc_order_id)
+		wc_line_items = wc_order.get("line_items")
+		self.assertEqual(wc_line_items[0].get("quantity"), 2)
+		self.assertEqual(len(wc_line_items[0]["meta_data"]), 1)
+		self.assertEqual(wc_line_items[0]["meta_data"][0]["key"], "custom_field")
+		self.assertEqual(wc_line_items[0]["meta_data"][0]["value"], "custom_value")
+
+		# Delete order in WooCommerce
+		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 		"""
 		Test that the Sales Order Synchronisation method creates a new Sales order when there is a new
 		WooCommerce order, and that coupons are taken into account

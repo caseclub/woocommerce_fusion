@@ -416,8 +416,13 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				# Add the correct lines
 				replacement_line_items.extend(
 					[
-						{"product_id": so_item.woocommerce_id, "quantity": so_item.qty, "price": so_item.rate}
-						for so_item in sales_order.items
+						{
+							"product_id": so_item.woocommerce_id,
+							"quantity": so_item.qty,
+							"price": so_item.rate,
+							"meta_data": line_items[i].get("meta_data", []) if i < len(line_items) else [],
+						}
+						for i, so_item in enumerate(sales_order.items)
 					]
 				)
 				wc_order.line_items = json.dumps(replacement_line_items)
