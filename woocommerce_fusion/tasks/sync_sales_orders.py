@@ -111,7 +111,7 @@ def sync_woocommerce_orders_modified_since(date_time_from=None):
 		except Exception:
 			pass
 
-	frappe.db.set_value("WooCommerce Settings", "WooCommerce Settings", "wc_last_sync_date", now())
+	frappe.db.set_single_value("WooCommerce Settings", "wc_last_sync_date_items", now())
 
 
 class SynchroniseSalesOrder(SynchroniseWooCommerce):
