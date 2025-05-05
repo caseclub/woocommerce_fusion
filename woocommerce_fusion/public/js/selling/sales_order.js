@@ -1,8 +1,8 @@
 frappe.ui.form.on('Sales Order', {
 	refresh: function(frm) {
-		// Add a custom button to navigate to WooCommerce dashboard and open this order
+		// Add a custom button to navigate to WooCommerce and open this order
 		if (frm.doc.woocommerce_id){
-			frm.add_custom_button(__("Open in WooCommerce Dashboard"), function () {
+			frm.add_custom_button(__("Open in WooCommerce"), function () {
 				frappe.db.get_value('WooCommerce Server', frm.doc.woocommerce_server, 'woocommerce_server_url', (values) => {
 					window.open(values.woocommerce_server_url + `/wp-admin/post.php?post=${frm.doc.woocommerce_id}&action=edit`, "_blank");
 				});
