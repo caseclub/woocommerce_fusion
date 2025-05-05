@@ -1,12 +1,14 @@
 import json
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, Union
 
 import frappe
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
+from erpnext.selling.doctype.sales_order_item.sales_order_item import SalesOrderItem
 from frappe import _
 from frappe.utils import get_datetime
 from frappe.utils.data import cstr, now
+from jsonpath_ng.ext import parse
 
 from woocommerce_fusion.exceptions import SyncDisabledError, WooCommerceOrderNotFoundError
 from woocommerce_fusion.tasks.sync import SynchroniseWooCommerce
@@ -109,10 +111,7 @@ def sync_woocommerce_orders_modified_since(date_time_from=None):
 		except Exception:
 			pass
 
-	wc_settings.reload()
-	wc_settings.wc_last_sync_date = now()
-	wc_settings.flags.ignore_mandatory = True
-	wc_settings.save()
+	frappe.db.set_single_value("WooCommerce Settings", "wc_last_sync_date_items", now())
 
 
 class SynchroniseSalesOrder(SynchroniseWooCommerce):
@@ -362,8 +361,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			sales_order.custom_attempted_woocommerce_auto_payment_entry = 1
 			return True
 
-	@staticmethod
-	def update_woocommerce_order(wc_order: WooCommerceOrder, sales_order: SalesOrder) -> None:
+	def update_woocommerce_order(self, wc_order: WooCommerceOrder, sales_order: SalesOrder) -> None:
 		"""
 		Update the WooCommerce Order with fields from it's corresponding ERPNext Sales Order
 		"""
@@ -409,22 +407,70 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 						break
 
 			if sales_order_items_changed:
+				# Build the correct lines
+				new_line_items = [
+					{
+						"product_id": so_item.woocommerce_id,
+						"quantity": so_item.qty,
+						"price": so_item.rate,
+						"meta_data": line_items[i].get("meta_data", []) if i < len(line_items) else [],
+					}
+					for i, so_item in enumerate(sales_order.items)
+				]
+				# Process Order Item Line Field Mappings
+				for i, line_item in enumerate(new_line_items):
+					self.set_wc_order_line_items_mapped_fields(line_item, sales_order.items[i])
+
 				# Set the product_id for existing lines to null, to clear the line items for the WooCommerce order
 				replacement_line_items = [
 					{"id": line_item["id"], "product_id": None} for line_item in json.loads(wc_order.line_items)
 				]
-				# Add the correct lines
-				replacement_line_items.extend(
-					[
-						{"product_id": so_item.woocommerce_id, "quantity": so_item.qty, "price": so_item.rate}
-						for so_item in sales_order.items
-					]
-				)
+				replacement_line_items.extend(new_line_items)
+
 				wc_order.line_items = json.dumps(replacement_line_items)
 				wc_order_dirty = True
 
 		if wc_order_dirty:
 			wc_order.save()
+
+	def set_wc_order_line_items_mapped_fields(
+		self, woocommerce_order_line_item: Dict, so_item: SalesOrderItem
+	) -> Tuple[bool, WooCommerceOrder]:
+		"""
+		If there exist any Field Mappings on `WooCommerce Server`, attempt to set their values from
+		ERPNext to WooCommerce
+		"""
+		wc_line_item_dirty = False
+		if woocommerce_order_line_item and self.sales_order and self.woocommerce_order:
+			wc_server = frappe.get_cached_doc(
+				"WooCommerce Server", self.woocommerce_order.woocommerce_server
+			)
+			if wc_server.order_line_item_field_map:
+				for map in wc_server.order_line_item_field_map:
+					erpnext_item_field_name = map.erpnext_field_name.split(" | ")
+					erpnext_item_field_value = getattr(so_item, erpnext_item_field_name[0])
+
+					# We expect woocommerce_field_name to be valid JSONPath
+					jsonpath_expr = parse(map.woocommerce_field_name)
+					woocommerce_order_line_field_matches = jsonpath_expr.find(woocommerce_order_line_item)
+
+					if len(woocommerce_order_line_field_matches) == 0:
+						if self.woocommerce_order.name:
+							# The field should exist, else raise an error
+							raise ValueError(
+								_("Field <code>{0}</code> not found in Item Line of WooCommerce Order {1}").format(
+									map.woocommerce_field_name, self.woocommerce_order.name
+								)
+							)
+
+					# JSONPath parsing typically returns a list, we'll only take the first value
+					woocommerce_order_line_field_value = woocommerce_order_line_field_matches[0].value
+
+					if erpnext_item_field_value != woocommerce_order_line_field_value:
+						jsonpath_expr.update(woocommerce_order_line_item, erpnext_item_field_value)
+						wc_line_item_dirty = True
+
+		return wc_line_item_dirty, woocommerce_order_line_item
 
 	def create_sales_order(self, wc_order: WooCommerceOrder) -> None:
 		"""
@@ -622,20 +668,26 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				)
 
 			wc_server.sales_taxes_and_charges_template
+
+			new_sales_order_line = {
+				"item_code": found_item.name,
+				"item_name": found_item.item_name,
+				"description": found_item.item_name,
+				"delivery_date": new_sales_order.delivery_date,
+				"qty": item.get("quantity"),
+				"rate": item.get("price")
+				if wc_server.use_actual_tax_type or not tax_template.taxes[0].included_in_print_rate
+				else get_tax_inc_price_for_woocommerce_line_item(item),
+				"warehouse": wc_server.warehouse,
+				"discount_percentage": 100 if item.get("price") == 0 else 0,
+			}
+
+			# Process Order Item Line Field Mappings
+			self.set_sales_order_item_fields(woocommerce_order_line_item=item, so_item=new_sales_order_line)
+
 			new_sales_order.append(
 				"items",
-				{
-					"item_code": found_item.name,
-					"item_name": found_item.item_name,
-					"description": found_item.item_name,
-					"delivery_date": new_sales_order.delivery_date,
-					"qty": item.get("quantity"),
-					"rate": item.get("price")
-					if wc_server.use_actual_tax_type or not tax_template.taxes[0].included_in_print_rate
-					else get_tax_inc_price_for_woocommerce_line_item(item),
-					"warehouse": wc_server.warehouse,
-					"discount_percentage": 100 if item.get("price") == 0 else 0,
-				},
+				new_sales_order_line,
 			)
 
 			if not wc_server.use_actual_tax_type:
@@ -664,6 +716,38 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			new_sales_order.grand_total = float(wc_order.total)
 			new_sales_order.base_rounded_total = float(wc_order.total)
 			new_sales_order.rounded_total = float(wc_order.total)
+
+	def set_sales_order_item_fields(
+		self, woocommerce_order_line_item: Dict, so_item: Union[SalesOrderItem, Dict]
+	) -> Tuple[bool, WooCommerceOrder]:
+		"""
+		If there exist any Order Item Line Field Mappings on `WooCommerce Server`, attempt to set their values from
+		the WooCommerce Order Line Item to the ERPNext Sales Order Item
+
+		Returns true if woocommerce_order_line_item was changed
+		"""
+		so_item_dirty = False
+		if so_item and self.woocommerce_order:
+			wc_server = frappe.get_cached_doc(
+				"WooCommerce Server", self.woocommerce_order.woocommerce_server
+			)
+			if wc_server.order_line_item_field_map:
+				for map in wc_server.order_line_item_field_map:
+					erpnext_item_field_name = map.erpnext_field_name.split(" | ")
+
+					# We expect woocommerce_field_name to be valid JSONPath
+					jsonpath_expr = parse(map.woocommerce_field_name)
+					woocommerce_order_line_item_field_matches = jsonpath_expr.find(woocommerce_order_line_item)
+
+					if len(woocommerce_order_line_item_field_matches) > 0:
+						if type(so_item) is dict:
+							so_item[erpnext_item_field_name[0]] = woocommerce_order_line_item_field_matches[0].value
+						else:
+							setattr(
+								so_item, erpnext_item_field_name[0], woocommerce_order_line_item_field_matches[0].value
+							)
+							so_item_dirty = True
+			return so_item_dirty, so_item
 
 	def create_or_update_address(self, wc_order: WooCommerceOrder):
 		"""

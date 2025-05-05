@@ -29,4 +29,4 @@ By default only the actual stock levels will be synchronised. You can ensure tha
 - You can look at the list of **WooCommerce Products** from within ERPNext by opening the **WooCommerce Product** doctype. This is a [Virtual DocType](https://frappeframework.com/docs/v15/user/en/basics/doctypes/virtual-doctype) that interacts directly with your WooCommerce site's API interface
 - Any errors during this process can be found under **Error Log**.
 - You can also check the **Scheduled Job Log** for the `stock_update.update_stock_levels_for_all_enabled_items_in_background` Scheduled Job.
-- A history of all API calls made to your Wordpress Site can be found under **WooCommerce Request Log**
+- A history of all API calls made to your Wordpress Site can be found under **WooCommerce Request Log** (*Enable WooCommerce Request Logs* needs to be turned on on **WooCommerce Server** > *Logs*)

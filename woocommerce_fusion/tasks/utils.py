@@ -2,6 +2,7 @@ import traceback
 
 import frappe
 import requests
+from frappe.utils.caching import redis_cache
 from woocommerce import API
 
 
@@ -13,7 +14,7 @@ class APIWithRequestLogging(API):
 		result = None
 		try:
 			result = super()._API__request(method, endpoint, data, params, **kwargs)
-			if not frappe.flags.in_test:
+			if not frappe.flags.in_test and is_woocommerce_request_logging_enabled(self.url):
 				frappe.enqueue(
 					"woocommerce_fusion.tasks.utils.log_woocommerce_request",
 					url=self.url,
@@ -26,7 +27,7 @@ class APIWithRequestLogging(API):
 				)
 			return result
 		except Exception as e:
-			if not frappe.flags.in_test:
+			if not frappe.flags.in_test and is_woocommerce_request_logging_enabled(self.url):
 				frappe.enqueue(
 					"woocommerce_fusion.tasks.utils.log_woocommerce_request",
 					url=self.url,
@@ -38,6 +39,25 @@ class APIWithRequestLogging(API):
 					traceback="".join(traceback.format_stack(limit=8)),
 				)
 			raise e
+
+
+@redis_cache(ttl=86400)
+def is_woocommerce_request_logging_enabled(woocommerce_server_url: str) -> bool:
+	"""
+	Checks if WooCommerce request logging is enabled for the given WooCommerce server URL.
+	Args:
+	        woocommerce_server_url (str): The URL of the WooCommerce server.
+	Returns:
+	        bool: True if request logging is enabled, False otherwise.
+	"""
+	enabled = frappe.get_all(
+		"WooCommerce Server",
+		filters={"woocommerce_server_url": woocommerce_server_url},
+		fields=["enable_woocommerce_request_logs"],
+	)
+	if not enabled:
+		return False
+	return enabled[0].enable_woocommerce_request_logs
 
 
 def log_woocommerce_request(
@@ -61,7 +81,6 @@ def log_woocommerce_request(
 			"response": f"{str(res)}\n{res.text}" if res is not None else None,
 			"error": frappe.get_traceback(),
 			"status": "Success" if res and res.status_code in [200, 201] else "Error",
-			"traceback": traceback,
 			"time_elapsed": res.elapsed.total_seconds() if res is not None else None,
 		}
 	)

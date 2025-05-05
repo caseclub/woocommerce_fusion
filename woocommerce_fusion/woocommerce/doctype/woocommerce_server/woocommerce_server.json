@@ -56,6 +56,9 @@
   "enable_so_status_sync",
   "enable_so_status_sync_warning_html",
   "sales_order_status_map",
+  "order_item_line_fields_section",
+  "order_item_fields_warning_html",
+  "order_line_item_field_map",
   "tab_items",
   "item_section",
   "name_by",
@@ -75,7 +78,9 @@
   "tab_plugins",
   "advanced_shipment_tracking_section",
   "wc_plugin_advanced_shipment_tracking",
-  "wc_ast_shipment_providers"
+  "wc_ast_shipment_providers",
+  "tab_logs",
+  "enable_woocommerce_request_logs"
  ],
  "fields": [
   {
@@ -511,11 +516,41 @@
    "fieldname": "subtract_reserved_stock",
    "fieldtype": "Check",
    "label": "Reserved Stock Adjustment"
+  },
+  {
+   "fieldname": "tab_logs",
+   "fieldtype": "Tab Break",
+   "label": "Logs"
+  },
+  {
+   "default": "0",
+   "description": "Log every request to your WooCommerce Server",
+   "fieldname": "enable_woocommerce_request_logs",
+   "fieldtype": "Check",
+   "label": "Enable WooCommerce Request Logs"
+  },
+  {
+   "fieldname": "order_item_line_fields_section",
+   "fieldtype": "Section Break",
+   "label": "Order Item Line Fields"
+  },
+  {
+   "fieldname": "order_item_fields_warning_html",
+   "fieldtype": "HTML",
+   "options": "<div class=\"alert alert-warning\">\nMapping item fields is recommended for advanced users only. Make sure to monitor Error Logs after adding field mappings.\n</div>"
+  },
+  {
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/items.html#custom-fields-mapping",
+   "fieldname": "order_line_item_field_map",
+   "fieldtype": "Table",
+   "label": "Fields Mapping",
+   "options": "WooCommerce Server Order Item Field"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-03-02 12:12:53.464419",
+ "modified": "2025-05-05 17:31:36.634244",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
@@ -579,6 +614,7 @@
    "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

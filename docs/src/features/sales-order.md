@@ -48,6 +48,30 @@ Note that if sync for an **Item** is disabled (i.e. the "Enabled" checkbox on th
 | customer_note | **Sales Order** > *WooCommerce Customer Note* |                                                                                                                                                                                       |
 
 
+## Custom Fields Mapping for Sales Order Items
+
+You can use [JSONPath](https://pypi.org/project/jsonpath-ng/) to map **Sales Order Item** fields to specific **WooCommerce Order Line Item** fields.
+
+Here are a few examples:
+- `$.tax_class` retrieves the content of the 'Tax Class' WooCommerce Order Line Item field.
+- `$.meta_data[?(@.key=='my_metadata_field')].value` retrieves the value of a Metadata entry with a `key` of `my_metadata_field`
+
+where `$` refers to the **WooCommerce Order Line** object
+
+
+![Sales Order Item Fields Mapping](../images/sales-order-item-fields-mapping.png)
+
+To figure out the correct JSONPath expression, you can:
+1. Go to any **WooCommerce Order** and look at the 'Line Items' data
+2. Open [JSONPath Online Validator](https://jsonpath.com/) and copy the relevant 'Line Items' data from the **WooCommerce Order** to the *Document* text box.
+3. Play around to get the JSONPath Query to return what you need. LLM's can be a big help here.
+
+
+
+
+**Note that this is recommended for advanced users only. This is a very basic functionality - there are no field type conversions possible as of yet.
+
+
 ## Customer Synchronisation
 
 Each **Customer** record has a `woocommerce_identifier` custom field. This identifier is set depending on if the **WooCommerce Order** is from a guest or not:
@@ -84,5 +108,5 @@ Each **Customer** record has a `woocommerce_identifier` custom field. This ident
 - You can look at the list of **WooCommerce Orders** from within ERPNext by opening the **WooCommerce Order** doctype. This is a [Virtual DocType](https://frappeframework.com/docs/v15/user/en/basics/doctypes/virtual-doctype) that interacts directly with your WooCommerce site's API interface
 - Any errors during this process can be found under **Error Log**.
 - You can also check the **Scheduled Job Log** for the `sync_sales_orders.run_sales_orders_sync` Scheduled Job.
-- A history of all API calls made to your Wordpress Site can be found under **WooCommerce Request Log**
+- A history of all API calls made to your Wordpress Site can be found under **WooCommerce Request Log** (*Enable WooCommerce Request Logs* needs to be turned on on **WooCommerce Server** > *Logs*)
 
