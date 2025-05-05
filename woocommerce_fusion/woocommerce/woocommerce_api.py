@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import format_datetime, get_datetime
 
 from woocommerce_fusion.exceptions import SyncDisabledError
 from woocommerce_fusion.tasks.utils import APIWithRequestLogging
@@ -490,6 +491,7 @@ def get_wc_parameters_from_filters(filters):
 		"name",
 		"status",
 		"woocommerce_server",
+		"customer_id",
 	]
 
 	params = {}
@@ -505,6 +507,17 @@ def get_wc_parameters_from_filters(filters):
 			# e.g. ['WooCommerce Order', 'date_created', '>', '2023-01-01']
 			params["after"] = filter[3]
 			continue
+		if filter[1] == "date_created" and filter[2] == "Between":
+			# e.g. ['WooCommerce Order', 'date_created', 'Between', '[2023-01-01, 2023-01-20]']
+			if not filter[3]:
+				continue
+			params["after"] = format_datetime(
+				get_datetime(f"{filter[3][0]} 00:00:00"), "yyyy-MM-dd HH:mm:ss"
+			)
+			params["before"] = format_datetime(
+				get_datetime(f"{filter[3][1]} 00:00:00"), "yyyy-MM-dd HH:mm:ss"
+			)
+			continue
 		if filter[1] == "date_modified" and filter[2] == "<":
 			# e.g. ['WooCommerce Order', 'date_modified', '<', '2023-01-01']
 			params["modified_before"] = filter[3]
@@ -512,6 +525,17 @@ def get_wc_parameters_from_filters(filters):
 		if filter[1] == "date_modified" and filter[2] == ">":
 			# e.g. ['WooCommerce Order', 'date_modified', '>', '2023-01-01']
 			params["modified_after"] = filter[3]
+			continue
+		if filter[1] == "date_modified" and filter[2] == "Between":
+			# e.g. ['WooCommerce Order', 'date_created', 'Between', '[2023-01-01, 2023-01-20]']
+			if not filter[3]:
+				continue
+			params["after"] = format_datetime(
+				get_datetime(f"{filter[3][0]} 00:00:00"), "yyyy-MM-dd HH:mm:ss"
+			)
+			params["before"] = format_datetime(
+				get_datetime(f"{filter[3][1]} 00:00:00"), "yyyy-MM-dd HH:mm:ss"
+			)
 			continue
 		if filter[1] == "id" and filter[2] == "=":
 			# e.g. ['WooCommerce Order', 'id', '=', '11']
@@ -523,6 +547,10 @@ def get_wc_parameters_from_filters(filters):
 			continue
 		if filter[1] == "name" and filter[2] == "like":
 			# e.g. ['WooCommerce Order', 'name', 'like', '%11%']
+			params["search"] = filter[3].strip("%")
+			continue
+		if filter[1] == "customer_id" and filter[2] == "like":
+			# e.g. ['WooCommerce Order', 'customer_id', 'like', '%11%']
 			params["search"] = filter[3].strip("%")
 			continue
 		if filter[1] == "status" and filter[2] == "=":
