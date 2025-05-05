@@ -24,6 +24,18 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 	def setUpClass(cls):
 		super().setUpClass()  # important to call super() methods when extending TestCase.
 
+	def setUp(self):
+		super().setUp()
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.submit_sales_orders = 1
+		wc_server.enable_payments_sync = 1
+		wc_server.enable_shipping_methods_sync = 0
+		wc_server.enable_so_status_sync = 0
+		wc_server.flags.ignore_mandatory = True
+		wc_server.order_line_item_field_map = []
+		wc_server.item_field_map = []
+		wc_server.save()
+
 	def _create_sales_taxes_and_charges_template(
 		self, wc_server, rate: float, included_in_rate: bool = False
 	) -> str:
@@ -296,6 +308,46 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)
 
+	def test_sync_create_new_sales_order_with_mapped_field(self, mock_log_error):
+		"""
+		Test that the Sales Order Synchronisation method creates a new Sales order when there is a new
+		WooCommerce order, and that mapped fields are taken into account
+		"""
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		# Map Erpnext Sales Order Item description to WC Order Line Meta Data with key 'custom_field'
+		wc_server.order_line_item_field_map = []
+		row = wc_server.append("order_line_item_field_map")
+		row.erpnext_field_name = "description | Description"
+		row.woocommerce_field_name = "$.meta_data[?(@.key=='custom_field')].value"
+		wc_server.save()
+
+		# Create a new order in WooCommerce
+		wc_order_id, wc_order_name = self.post_woocommerce_order(
+			payment_method_title="Doge",
+			item_price=10,
+			item_qty=1,
+			customer_note="The big brown fox",
+			line_item_metadata=[{"key": "custom_field", "value": "custom_value"}],
+		)
+
+		# Run synchronisation
+		run_sales_order_sync(woocommerce_order_name=wc_order_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Sales Order in ERPNext
+		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id})
+		self.assertIsNotNone(sales_order_name)
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+
+		# Expect value in mapped field in Sales Order Item
+		self.assertEqual(sales_order.items[0].description, "custom_value")
+
+		# Delete order in WooCommerce
+		self.delete_woocommerce_order(wc_order_id=wc_order_id)
+
 	def test_sync_updates_woocommerce_order(self, mock_log_error):
 		"""
 		Test that the Sales Order Synchronisation method updates a WooCommerce Order
@@ -362,6 +414,73 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.assertEqual(wc_line_items[1].get("name"), item.name)
 		self.assertEqual(wc_line_items[1].get("quantity"), 1)
 		self.assertEqual(get_tax_inc_price_for_woocommerce_line_item(wc_line_items[1]), 20)
+
+		# Delete order in WooCommerce
+		self.delete_woocommerce_order(wc_order_id=wc_order_id)
+
+	def test_sync_updates_woocommerce_order_with_mapped_field(self, mock_log_error):
+		"""
+		Test that the Sales Order Synchronisation method updates a WooCommerce Order
+		with changed fields from Sales Order, and that mapped fields are taken into account
+		"""
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.submit_sales_orders = 0
+		wc_server.enable_payments_sync = 0
+		wc_server.sync_so_items_to_wc = 1
+		wc_server.flags.ignore_mandatory = True
+
+		# Map Erpnext Sales Order Item description to WC Order Line Meta Data with key 'custom_field'
+		wc_server.order_line_item_field_map = []
+		row = wc_server.append("order_line_item_field_map")
+		row.erpnext_field_name = "description | Description"
+		row.woocommerce_field_name = "$.meta_data[?(@.key=='custom_field')].value"
+
+		wc_server.save()
+
+		# Create a new order in WooCommerce
+		wc_order_id, wc_order_name = self.post_woocommerce_order(
+			payment_method_title="Doge",
+			item_price=10,
+			item_qty=3,
+			line_item_metadata=[{"key": "custom_field", "value": "custom_value"}],
+		)
+
+		# Create an additional item in WooCommerce and in ERPNext, and link them
+		wc_product_id = self.post_woocommerce_product(product_name="ADDITIONAL_ITEM", regular_price=20)
+		# Create the same product in ERPNext and link it
+		item = create_item(
+			"ADDITIONAL_ITEM", valuation_rate=10, warehouse=None, company=get_default_company()
+		)
+		row = item.append("woocommerce_servers")
+		row.woocommerce_id = wc_product_id
+		row.woocommerce_server = get_woocommerce_server(self.wc_url).name
+		item.save()
+
+		# Run synchronisation for the ERPNext Sales Order to be created
+		run_sales_order_sync(woocommerce_order_name=wc_order_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Sales Order in ERPNext
+		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id}, "name")
+		self.assertIsNotNone(sales_order_name)
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+
+		# In ERPNext, change description (mapped field) of first item, and add an additional item
+		sales_order.items[0].description = "custom_value_from_erpnext"
+		sales_order.save()
+		sales_order.submit()
+
+		# Run synchronisation again, to sync the Sales Order changes
+		run_sales_order_sync(sales_order_name=sales_order.name)
+		mock_log_error.assert_not_called()
+
+		# Expect WooCommerce Order to have updated items
+		wc_order = self.get_woocommerce_order(order_id=wc_order_id)
+		wc_line_items = wc_order.get("line_items")
+		self.assertEqual(wc_line_items[0]["meta_data"][0]["value"], "custom_value_from_erpnext")
 
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)

@@ -56,6 +56,9 @@
   "enable_so_status_sync",
   "enable_so_status_sync_warning_html",
   "sales_order_status_map",
+  "order_item_line_fields_section",
+  "order_item_fields_warning_html",
+  "order_line_item_field_map",
   "tab_items",
   "item_section",
   "name_by",
@@ -525,12 +528,29 @@
    "fieldname": "enable_woocommerce_request_logs",
    "fieldtype": "Check",
    "label": "Enable WooCommerce Request Logs"
+  },
+  {
+   "fieldname": "order_item_line_fields_section",
+   "fieldtype": "Section Break",
+   "label": "Order Item Line Fields"
+  },
+  {
+   "fieldname": "order_item_fields_warning_html",
+   "fieldtype": "HTML",
+   "options": "<div class=\"alert alert-warning\">\nMapping item fields is recommended for advanced users only. Make sure to monitor Error Logs after adding field mappings.\n</div>"
+  },
+  {
+   "documentation_url": "https://woocommerce-fusion-docs.finfoot.tech/features/items.html#custom-fields-mapping",
+   "fieldname": "order_line_item_field_map",
+   "fieldtype": "Table",
+   "label": "Fields Mapping",
+   "options": "WooCommerce Server Order Item Field"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-05-04 16:44:09.285315",
+ "modified": "2025-05-05 17:31:36.634244",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",

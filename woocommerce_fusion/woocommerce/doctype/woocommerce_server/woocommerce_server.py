@@ -113,7 +113,7 @@ class WooCommerceServer(Document):
 
 	@frappe.whitelist()
 	@redis_cache(ttl=600)
-	def get_item_docfields(self):
+	def get_item_docfields(self, doctype: str) -> List[dict]:
 		"""
 		Get a list of DocFields for the Item Doctype
 		"""
@@ -130,12 +130,12 @@ class WooCommerceServer(Document):
 		docfields = frappe.get_all(
 			"DocField",
 			fields=["label", "name", "fieldname"],
-			filters=[["fieldtype", "not in", invalid_field_types], ["parent", "=", "Item"]],
+			filters=[["fieldtype", "not in", invalid_field_types], ["parent", "=", doctype]],
 		)
 		custom_fields = frappe.get_all(
 			"Custom Field",
 			fields=["label", "name", "fieldname"],
-			filters=[["fieldtype", "not in", invalid_field_types], ["dt", "=", "Item"]],
+			filters=[["fieldtype", "not in", invalid_field_types], ["dt", "=", doctype]],
 		)
 		return docfields + custom_fields
 
