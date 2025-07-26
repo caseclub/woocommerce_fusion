@@ -477,7 +477,7 @@
   "insert_after": "custom_woocommerce_tab",
   "is_system_generated": 0,
   "is_virtual": 0,
-  "label": "",
+  "label": "WooCommerce Servers",
   "length": 0,
   "link_filters": null,
   "mandatory_depends_on": null,
