@@ -62,6 +62,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		wc_server.price_list = "_Test Price List"
 		bank_account = create_bank_account()
 		gl_account = create_gl_account_for_bank()
+		create_gl_account_for_tax()
 		wc_server.enable_payments_sync = 1
 		wc_server.payment_method_bank_account_mapping = json.dumps({"bacs": bank_account.name})
 		wc_server.payment_method_gl_account_mapping = json.dumps({"bacs": gl_account.name})
@@ -514,6 +515,21 @@ def create_gl_account_for_bank(account_name="_Test Bank"):
 		pass
 
 	return frappe.get_doc("Account", {"account_name": account_name})
+
+
+def create_gl_account_for_tax():
+	try:
+		frappe.get_doc(
+			{
+				"doctype": "Account",
+				"company": get_default_company(),
+				"account_name": "VAT",
+				"parent_account": "Duties and Taxes - SC",
+				"type": "Bank",
+			}
+		).insert(ignore_if_duplicate=True)
+	except frappe.DuplicateEntryError:
+		pass
 
 
 def get_woocommerce_server(woocommerce_server_url: str):
