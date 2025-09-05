@@ -97,6 +97,7 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 		customer_note: str = None,
 		coupon_code: str = None,
 		line_item_metadata: List[dict] = None,
+		fee_lines: List[dict] = None,
 	) -> Tuple[str, str]:
 		"""
 		Create a dummy order on a WooCommerce testing site
@@ -159,6 +160,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 			data["coupon_lines"] = [{"code": coupon_code}]
 		if line_item_metadata:
 			data["line_items"][0]["meta_data"] = line_item_metadata
+		if fee_lines:
+			data["fee_lines"] = fee_lines
 		payload = json.dumps(data)
 		headers = {"Content-Type": "application/json"}
 

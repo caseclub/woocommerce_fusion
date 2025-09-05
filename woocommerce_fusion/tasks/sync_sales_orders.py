@@ -520,6 +520,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				new_sales_order.shipping_rule = shipping_rule_mapping.shipping_rule
 
 		self.set_items_in_sales_order(new_sales_order, wc_order)
+		self.set_fee_lines_in_sales_order(new_sales_order, wc_order)
 		new_sales_order.flags.ignore_mandatory = True
 		new_sales_order.flags.created_by_sync = True
 		new_sales_order.insert()
@@ -716,6 +717,45 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			new_sales_order.grand_total = float(wc_order.total)
 			new_sales_order.base_rounded_total = float(wc_order.total)
 			new_sales_order.rounded_total = float(wc_order.total)
+
+	def set_fee_lines_in_sales_order(self, new_sales_order, wc_order):
+		"""
+		If enabled, Synchronise Fee Lines from Woo Order to ERPNext Sales Order
+		"""
+		wc_server = frappe.get_cached_doc("WooCommerce Server", new_sales_order.woocommerce_server)
+		if wc_server.enable_order_fees_sync:
+			if not wc_server.account_for_order_fee_lines:
+				frappe.throw(_("Please set 'Account for Order Fee Lines' in WooCommerce Server"))
+		if not wc_order.fee_lines:
+			return
+		for fee_line in json.loads(wc_order.fee_lines):
+
+			# Add line for fee in Taxes and Charges table
+			new_sales_order.append(
+				"taxes",
+				{
+					"charge_type": "Actual",
+					"account_head": wc_server.account_for_order_fee_lines,
+					"tax_amount": fee_line["total"],
+					"description": fee_line["name"],
+				},
+			)
+
+			# Add line for fee's taxes in Taxes and Charges table
+			if fee_line["tax_status"] == "taxable" or len(fee_line["taxes"]) > 0:
+				if not wc_server.tax_account_for_order_fee_lines:
+					frappe.throw(_("Please set 'Tax Account for Order Fee Lines' in WooCommerce Server"))
+
+				for fee_line_tax in fee_line["taxes"]:
+					new_sales_order.append(
+						"taxes",
+						{
+							"charge_type": "Actual",
+							"account_head": wc_server.tax_account_for_order_fee_lines,
+							"tax_amount": fee_line_tax["total"],
+							"description": fee_line["name"] + _(" Tax"),
+						},
+					)
 
 	def set_sales_order_item_fields(
 		self, woocommerce_order_line_item: Dict, so_item: Union[SalesOrderItem, Dict]

@@ -880,7 +880,8 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 
 		# Expect correct items in Sales Order
 		self.assertEqual(sales_order.items[0].rate, 7.83)  # 8.7 - 10% coupon = 7.83
-		self.assertEqual(sales_order.items[0].qty, 1)
+		self.ass
+		ertEqual(sales_order.items[0].qty, 1)
 
 		# Expect correct tax rows in Sales Order
 		self.assertEqual(sales_order.taxes[0].charge_type, "Actual")
@@ -888,6 +889,65 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 		self.assertEqual(sales_order.taxes[0].tax_amount, 1.17)  # 1.3 - 10% coupon = 1.17
 		self.assertEqual(sales_order.taxes[0].total, 9)  # 10 - 10% coupon = 9
 		self.assertEqual(sales_order.taxes[0].account_head, "VAT - SC")
+
+		# Delete order in WooCommerce
+		self.delete_woocommerce_order(wc_order_id=wc_order_id)
+
+	def test_order_fee_lines_are_synced_when_enabled(self, mock_log_error):
+		"""
+		Test that Order Fee Lines are synchronised when enabled
+		"""
+		# Setup
+		wc_server = frappe.get_doc("WooCommerce Server", self.wc_server.name)
+		wc_server.enable_order_fees_sync = 1
+		wc_server.account_for_order_fee_lines = "Sales Expenses - SC"
+		wc_server.tax_account_for_order_fee_lines = "VAT - SC"
+		wc_server.submit_sales_orders = 0
+		wc_server.flags.ignore_mandatory = True
+		wc_server.save()
+
+		# Create a new order in WooCommerce with fee lines
+		wc_order_id, wc_order_name = self.post_woocommerce_order(
+			payment_method_title="Doge",
+			item_price=10,
+			item_qty=1,
+			fee_lines=[
+				{
+					"name": "Local Pickup Fee",
+					"tax_class": "",
+					"tax_status": "taxable",
+					"amount": "30",
+					"total": "30.00",
+					"total_tax": "4.50",
+					"taxes": [{"id": 1, "total": "4.50", "subtotal": ""}],
+					"meta_data": [],
+				}
+			],
+		)
+
+		# Run synchronisation for the ERPNext Sales Order to be created
+		run_sales_order_sync(woocommerce_order_name=wc_order_name)
+
+		# Expect no errors logged
+		mock_log_error.assert_not_called()
+
+		# Expect newly created Sales Order in ERPNext
+		sales_order_name = frappe.get_value("Sales Order", {"woocommerce_id": wc_order_id}, "name")
+		self.assertIsNotNone(sales_order_name)
+		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+
+		# Expect correct taxes and charges row for fee in Sales Order
+		self.assertEqual(sales_order.taxes[-2].charge_type, "Actual")
+		self.assertEqual(sales_order.taxes[-2].rate, 0)
+		self.assertEqual(sales_order.taxes[-2].tax_amount, 30)
+		self.assertEqual(sales_order.taxes[-2].account_head, "Sales Expenses - SC")
+		self.assertEqual(sales_order.taxes[-2].description, "Local Pickup Fee")
+
+		# Expect correct taxes and charges row for fee tax in Sales Order
+		self.assertEqual(sales_order.taxes[-1].charge_type, "Actual")
+		self.assertEqual(sales_order.taxes[-1].rate, 0)
+		self.assertEqual(sales_order.taxes[-1].tax_amount, 4.5)
+		self.assertEqual(sales_order.taxes[-1].account_head, "VAT - SC")
 
 		# Delete order in WooCommerce
 		self.delete_woocommerce_order(wc_order_id=wc_order_id)

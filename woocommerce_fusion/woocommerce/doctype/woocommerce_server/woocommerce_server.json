@@ -59,6 +59,10 @@
   "order_item_line_fields_section",
   "order_item_fields_warning_html",
   "order_line_item_field_map",
+  "order_fees_section",
+  "enable_order_fees_sync",
+  "account_for_order_fee_lines",
+  "tax_account_for_order_fee_lines",
   "tab_items",
   "item_section",
   "name_by",
@@ -545,12 +549,39 @@
    "fieldtype": "Table",
    "label": "Fields Mapping",
    "options": "WooCommerce Server Order Item Field"
+  },
+  {
+   "fieldname": "order_fees_section",
+   "fieldtype": "Section Break",
+   "label": "Order Fees"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_order_fees_sync",
+   "fieldtype": "Check",
+   "label": "Enable Order Fee Lines Sync"
+  },
+  {
+   "depends_on": "eval: doc.enable_order_fees_sync",
+   "fieldname": "account_for_order_fee_lines",
+   "fieldtype": "Link",
+   "label": "Account for Order Fee Lines",
+   "mandatory_depends_on": "eval: doc.enable_order_fees_sync",
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval: doc.enable_order_fees_sync",
+   "description": "If the fee lines have a tax component, allocate it to this GL Account",
+   "fieldname": "tax_account_for_order_fee_lines",
+   "fieldtype": "Link",
+   "label": "Tax Account for Order Fee Lines",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-05-05 17:31:36.634244",
+ "modified": "2025-09-05 10:50:19.502545",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
