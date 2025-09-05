@@ -753,7 +753,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 							"charge_type": "Actual",
 							"account_head": wc_server.tax_account_for_order_fee_lines,
 							"tax_amount": fee_line_tax["total"],
-							"description": fee_line["name"] + _(" Tax"),
+							"description": fee_line["name"] + " " + _("Tax"),
 						},
 					)
 
