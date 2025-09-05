@@ -880,7 +880,7 @@ class TestIntegrationWooCommerceSync(TestIntegrationWooCommerce):
 
 		# Expect correct items in Sales Order
 		self.assertEqual(sales_order.items[0].rate, 7.83)  # 8.7 - 10% coupon = 7.83
-		self.ass
+		self.assertEqual(sales_order.items[0].qty, 1)
 		ertEqual(sales_order.items[0].qty, 1)
 
 		# Expect correct tax rows in Sales Order
