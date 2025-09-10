@@ -726,36 +726,36 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 		if wc_server.enable_order_fees_sync:
 			if not wc_server.account_for_order_fee_lines:
 				frappe.throw(_("Please set 'Account for Order Fee Lines' in WooCommerce Server"))
-		if not wc_order.fee_lines:
-			return
-		for fee_line in json.loads(wc_order.fee_lines):
+			if not wc_order.fee_lines:
+				return
+			for fee_line in json.loads(wc_order.fee_lines):
 
-			# Add line for fee in Taxes and Charges table
-			new_sales_order.append(
-				"taxes",
-				{
-					"charge_type": "Actual",
-					"account_head": wc_server.account_for_order_fee_lines,
-					"tax_amount": fee_line["total"],
-					"description": fee_line["name"],
-				},
-			)
+				# Add line for fee in Taxes and Charges table
+				new_sales_order.append(
+					"taxes",
+					{
+						"charge_type": "Actual",
+						"account_head": wc_server.account_for_order_fee_lines,
+						"tax_amount": fee_line["total"],
+						"description": fee_line["name"],
+					},
+				)
 
-			# Add line for fee's taxes in Taxes and Charges table
-			if fee_line["tax_status"] == "taxable" or len(fee_line["taxes"]) > 0:
-				if not wc_server.tax_account_for_order_fee_lines:
-					frappe.throw(_("Please set 'Tax Account for Order Fee Lines' in WooCommerce Server"))
+				# Add line for fee's taxes in Taxes and Charges table
+				if fee_line["tax_status"] == "taxable" or len(fee_line["taxes"]) > 0:
+					if not wc_server.tax_account_for_order_fee_lines:
+						frappe.throw(_("Please set 'Tax Account for Order Fee Lines' in WooCommerce Server"))
 
-				for fee_line_tax in fee_line["taxes"]:
-					new_sales_order.append(
-						"taxes",
-						{
-							"charge_type": "Actual",
-							"account_head": wc_server.tax_account_for_order_fee_lines,
-							"tax_amount": fee_line_tax["total"],
-							"description": fee_line["name"] + _(" Tax"),
-						},
-					)
+					for fee_line_tax in fee_line["taxes"]:
+						new_sales_order.append(
+							"taxes",
+							{
+								"charge_type": "Actual",
+								"account_head": wc_server.tax_account_for_order_fee_lines,
+								"tax_amount": fee_line_tax["total"],
+								"description": fee_line["name"] + _(" Tax"),
+							},
+						)
 
 	def set_sales_order_item_fields(
 		self, woocommerce_order_line_item: Dict, so_item: Union[SalesOrderItem, Dict]
