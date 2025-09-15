@@ -1,6 +1,8 @@
 {
     # Disables the admin endpoint to prevent port 2019 conflicts.
     admin off
+
+    http_port 8800
 }
 
 https://woo-test.localhost:443 {
