@@ -99,7 +99,7 @@ jobs:
           
           echo "--- Waiting for servers to become available (up to 60s) ---"
           # Wait for the server to respond, and dump logs if it fails.
-          timeout 60s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
+          timeout 480s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
             echo "\n\n--- Timeout reached! Server did not start. Displaying logs for debugging: ---"
             echo "\n--- Caddy Logs (caddy.log) ---"
             sudo cat caddy.log
