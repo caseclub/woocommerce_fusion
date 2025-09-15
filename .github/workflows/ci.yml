@@ -117,6 +117,7 @@ jobs:
           bench --site test_site run-tests --app woocommerce_fusion --coverage
         env:
           TYPE: server
+          DEV_SERVER: 1
           WOO_INTEGRATION_TESTS_WEBSERVER: "https://woo-test.localhost"
           WOO_API_CONSUMER_KEY: "ck_test_123456789"
           WOO_API_CONSUMER_SECRET: "cs_test_abcdefg"
