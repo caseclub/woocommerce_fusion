@@ -88,15 +88,20 @@ jobs:
       - name: Start WordPress Playground and Caddy
         working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
         run: |
-          # Start WordPress Playground in the background
-          npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --site-url=https://woo-test.localhost &
+          echo "--- Starting Caddy ---"
+          # Add a global option to disable the admin API, then start caddy
+          (echo -e "{\n\tadmin off\n}\n" && cat wp_woo_caddy) > Caddyfile.tmp && mv Caddyfile.tmp wp_woo_caddy
+          caddy run --config wp_woo_caddy --adapter caddyfile > caddy.log 2>&1 &
           
-          # Start Caddy in the background
-          caddy run --config wp_woo_caddy --adapter caddyfile &
-
-          # Wait for servers to initialize
-          echo "Waiting for servers to start..."
-          sleep 15
+          echo "--- Starting WordPress Playground on port 9400 ---"
+          # Start Playground and explicitly set the port to match the Caddy reverse_proxy
+          npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --port=9400 --site-url=https://woo-test.localhost > playground.log 2>&1 &
+          
+          echo "--- Waiting for servers to become available ---"
+          # Wait up to 60 seconds for the URL to be ready
+          timeout 60s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done'
+          
+          echo "Servers are up and running!"
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
@@ -109,12 +114,20 @@ jobs:
           WOO_API_CONSUMER_KEY: "ck_test_123456789"
           WOO_API_CONSUMER_SECRET: "cs_test_abcdefg"
 
+      - name: Display Server Logs on Failure
+        if: failure()
+        working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
+        run: |
+          echo "--- Caddy Logs ---"
+          cat caddy.log
+          echo "--- WordPress Playground Logs ---"
+          cat playground.log
+
       - name: Stop WordPress Playground and Caddy
         if: always()
         run: |
           echo "Cleaning up background processes..."
           sudo pkill -f caddy
-          # The Playground CLI runs PHP's built-in server.
           sudo pkill -f 'php -S'
 
       - name: Upload coverage data
