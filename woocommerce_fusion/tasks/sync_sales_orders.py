@@ -663,12 +663,10 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
 			# If we are applying a Sales Taxes and Charges Template (as opposed to Actual Tax), then we need to
 			# determine if the item price should include tax or not
-			if not wc_server.use_actual_tax_type:
+			if wc_server.enable_tax_lines_sync and not wc_server.use_actual_tax_type:
 				tax_template = frappe.get_cached_doc(
 					"Sales Taxes and Charges Template", wc_server.sales_taxes_and_charges_template
 				)
-
-			wc_server.sales_taxes_and_charges_template
 
 			new_sales_order_line = {
 				"item_code": found_item.name,
@@ -691,14 +689,15 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				new_sales_order_line,
 			)
 
-			if not wc_server.use_actual_tax_type:
-				new_sales_order.taxes_and_charges = wc_server.sales_taxes_and_charges_template
+			if wc_server.enable_tax_lines_sync:
+				if not wc_server.use_actual_tax_type:
+					new_sales_order.taxes_and_charges = wc_server.sales_taxes_and_charges_template
 
-				# Trigger taxes calculation
-				new_sales_order.set_missing_lead_customer_details()
-			else:
-				ordered_items_tax = item.get("total_tax")
-				add_tax_details(new_sales_order, ordered_items_tax, "Ordered Item tax", wc_server.tax_account)
+					# Trigger taxes calculation
+					new_sales_order.set_missing_lead_customer_details()
+				else:
+					ordered_items_tax = item.get("total_tax")
+					add_tax_details(new_sales_order, ordered_items_tax, "Ordered Item tax", wc_server.tax_account)
 
 		# If a Shipping Rule is added, shipping charges will be determined by the Shipping Rule. If not, then
 		# get it from the WooCommerce Order
