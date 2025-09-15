@@ -37,6 +37,8 @@ WC_ORDER_STATUS_MAPPING = {
 }
 WC_ORDER_STATUS_MAPPING_REVERSE = {v: k for k, v in WC_ORDER_STATUS_MAPPING.items()}
 
+verify_ssl = not frappe._dev_server
+
 
 @dataclass
 class WooCommerceOrderAPI(WooCommerceAPI):
@@ -69,6 +71,7 @@ class WooCommerceOrder(WooCommerceResource):
 					consumer_secret=server.api_consumer_secret,
 					version="wc/v3",
 					timeout=40,
+					verify_ssl=verify_ssl,
 				),
 				woocommerce_server_url=server.woocommerce_server_url,
 				woocommerce_server=server.name,

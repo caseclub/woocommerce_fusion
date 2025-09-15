@@ -13,6 +13,8 @@ default_company = get_default_company()
 default_bank = "Test Bank"
 default_bank_account = "Checking Account"
 
+verify_ssl = not frappe._dev_server
+
 
 class TestIntegrationWooCommerce(FrappeTestCase):
 	"""
@@ -113,6 +115,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/orders/"
@@ -181,6 +185,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/coupons"
@@ -231,6 +237,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/products/"
@@ -284,6 +292,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/orders/{wc_order_id}"
@@ -300,6 +310,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/products/{wc_product_id}?force=true"
@@ -316,6 +328,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/products/{product_id}"
@@ -337,6 +351,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/products/{product_id}"
@@ -358,6 +374,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = (
@@ -383,6 +401,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/orders/{order_id}"
@@ -403,6 +423,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/products/attributes"
@@ -434,6 +456,8 @@ class TestIntegrationWooCommerce(FrappeTestCase):
 
 		# Initialize OAuth1 session
 		oauth = OAuth1Session(self.wc_consumer_key, client_secret=self.wc_consumer_secret)
+		if not verify_ssl:
+			oauth.verify = False
 
 		# API Endpoint
 		url = f"{self.wc_url}/wp-json/wc/v3/products/{product_id}"

@@ -36,16 +36,41 @@ User documentation is hosted at [woocommerce-fusion-docs.finfoot.tech](https://w
 
 ### Tests
 
-To run unit and integration tests:
+#### Requirements
+For integration tests, we use [WordPress Playground](https://wordpress.org/playground/development-environments/) to spin up temporary Wordpress websites:
 
 ```shell
-bench --site test_site run-tests --app woocommerce_fusion --coverage
+npm i @wp-playground/cli
 ```
 
-#### InstaWP Requirement
-For integration tests, we use InstaWP to spin up temporary Wordpress websites.
+You also need to install [Caddy](https://caddyserver.com/docs/install#install), which acts as a reverse proxy. This allows us to call the Wordpress/WooCommerce API over SSL so that the same authentication method is used as production sites
 
-*TBD - steps to create a new site and template*
+Furthermore, have a Frappe site available with ERPNext and WooCommerce Fusion pre-installed.
+
+#### Run unit and integration tests
+
+1. Navigate to the app directory
+```
+cd frappe-bench/apps/woocommerce_fusion
+```
+
+2. Start Wordpress Playground
+```shell
+npx @wp-playground/cli server --blueprint wp_woo_blueprint.json  --site-url=https://woo-test.localhost
+```
+
+3. Start Caddy
+```shell
+caddy run --config wp_woo_caddy --adapter caddyfile
+```
+
+4. Set the correct environment variables and run the tests
+```shell
+export WOO_INTEGRATION_TESTS_WEBSERVER = "https://woo-test.localhost"
+export WOO_API_CONSUMER_KEY = "ck_test_123456789"
+export WOO_API_CONSUMER_SECRET = "cs_test_abcdefg"
+bench --site test_site run-tests --app woocommerce_fusion --coverage
+```
 
 ### Development
 

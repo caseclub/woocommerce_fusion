@@ -1,0 +1,44 @@
+{
+  "landingPage": "/wp-admin/",
+  "login": true,
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "woocommerce"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php include '/wordpress/wp-load.php'; global $wp_rewrite; $wp_rewrite->set_permalink_structure('/%postname%/'); $wp_rewrite->flush_rules(); ?>"
+    },
+    {
+      "step": "runPHP",
+      "code": "/* Skip the WooCommerce onboarding setup wizard */ <?php require_once '/wordpress/wp-load.php'; delete_transient('_wc_activation_redirect'); ?>"
+    },
+    {
+      "step": "runPHP",
+      "code": "/* Enable tax rates and calculations */ <?php require_once '/wordpress/wp-load.php'; update_option('woocommerce_calc_taxes', 'yes'); ?>"
+    },
+    {
+      "step": "runPHP",
+      "code": "/* Prices entered with tax = Yes */ <?php require_once '/wordpress/wp-load.php'; update_option('woocommerce_prices_include_tax', 'yes'); ?>"
+    },
+    {
+      "step": "runPHP",
+      "code": "/* Add 15% VAT Rate */ <?php require_once '/wordpress/wp-load.php'; global $wpdb; $wpdb->insert( $wpdb->prefix . 'woocommerce_tax_rates', [ 'tax_rate_country' => '', 'tax_rate_state' => '', 'tax_rate' => '15.0000', 'tax_rate_name' => 'VAT', 'tax_rate_priority' => 1, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 1, 'tax_rate_order' => 0, 'tax_rate_class' => '' ] ); ?>"
+    },
+    {
+      "step": "runPHP",
+      "code": "/* Set the timezone */ <?php require_once '/wordpress/wp-load.php'; update_option('timezone_string', 'Africa/Johannesburg'); ?>"
+    },
+    {
+      "step": "runPHP",
+      "code": "/* Insert a REST API Key */ <?php require_once '/wordpress/wp-load.php'; global $wpdb; $consumer_key = 'ck_test_123456789'; $consumer_secret = 'cs_test_abcdefg'; $hashed_key = wc_api_hash($consumer_key); $wpdb->insert($wpdb->prefix . 'woocommerce_api_keys', [ 'user_id' => 1, 'description' => 'CI Test Key', 'permissions' => 'read_write', 'consumer_key' => $hashed_key, 'consumer_secret' => $consumer_secret, 'truncated_key' => substr($consumer_key, -7), 'last_access' => null, 'nonces' => '' ]); echo json_encode([ 'consumer_key' => $consumer_key, 'consumer_secret' => $consumer_secret ]); ?>"
+    }
+  ]
+}

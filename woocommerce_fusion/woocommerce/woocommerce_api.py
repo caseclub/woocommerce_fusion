@@ -13,6 +13,13 @@ from woocommerce_fusion.tasks.utils import APIWithRequestLogging
 
 WC_RESOURCE_DELIMITER = "~"
 
+verify_ssl = not frappe._dev_server
+
+if frappe._dev_server:
+	import urllib3
+
+	urllib3.disable_warnings()
+
 
 @dataclass
 class WooCommerceAPI:
@@ -48,6 +55,7 @@ class WooCommerceResource(Document):
 					consumer_secret=server.api_consumer_secret,
 					version="wc/v3",
 					timeout=40,
+					verify_ssl=verify_ssl,
 				),
 				woocommerce_server_url=server.woocommerce_server_url,
 				woocommerce_server=server.name,
