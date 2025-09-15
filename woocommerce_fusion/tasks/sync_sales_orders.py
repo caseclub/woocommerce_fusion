@@ -520,6 +520,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				new_sales_order.shipping_rule = shipping_rule_mapping.shipping_rule
 
 		self.set_items_in_sales_order(new_sales_order, wc_order)
+		self.set_fee_lines_in_sales_order(new_sales_order, wc_order)
 		new_sales_order.flags.ignore_mandatory = True
 		new_sales_order.flags.created_by_sync = True
 		new_sales_order.insert()
@@ -662,12 +663,10 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
 			# If we are applying a Sales Taxes and Charges Template (as opposed to Actual Tax), then we need to
 			# determine if the item price should include tax or not
-			if not wc_server.use_actual_tax_type:
+			if wc_server.enable_tax_lines_sync and not wc_server.use_actual_tax_type:
 				tax_template = frappe.get_cached_doc(
 					"Sales Taxes and Charges Template", wc_server.sales_taxes_and_charges_template
 				)
-
-			wc_server.sales_taxes_and_charges_template
 
 			new_sales_order_line = {
 				"item_code": found_item.name,
@@ -690,14 +689,15 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				new_sales_order_line,
 			)
 
-			if not wc_server.use_actual_tax_type:
-				new_sales_order.taxes_and_charges = wc_server.sales_taxes_and_charges_template
+			if wc_server.enable_tax_lines_sync:
+				if not wc_server.use_actual_tax_type:
+					new_sales_order.taxes_and_charges = wc_server.sales_taxes_and_charges_template
 
-				# Trigger taxes calculation
-				new_sales_order.set_missing_lead_customer_details()
-			else:
-				ordered_items_tax = item.get("total_tax")
-				add_tax_details(new_sales_order, ordered_items_tax, "Ordered Item tax", wc_server.tax_account)
+					# Trigger taxes calculation
+					new_sales_order.set_missing_lead_customer_details()
+				else:
+					ordered_items_tax = item.get("total_tax")
+					add_tax_details(new_sales_order, ordered_items_tax, "Ordered Item tax", wc_server.tax_account)
 
 		# If a Shipping Rule is added, shipping charges will be determined by the Shipping Rule. If not, then
 		# get it from the WooCommerce Order
@@ -716,6 +716,45 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 			new_sales_order.grand_total = float(wc_order.total)
 			new_sales_order.base_rounded_total = float(wc_order.total)
 			new_sales_order.rounded_total = float(wc_order.total)
+
+	def set_fee_lines_in_sales_order(self, new_sales_order, wc_order):
+		"""
+		If enabled, Synchronise Fee Lines from Woo Order to ERPNext Sales Order
+		"""
+		wc_server = frappe.get_cached_doc("WooCommerce Server", new_sales_order.woocommerce_server)
+		if wc_server.enable_order_fees_sync:
+			if not wc_server.account_for_order_fee_lines:
+				frappe.throw(_("Please set 'Account for Order Fee Lines' in WooCommerce Server"))
+			if not wc_order.fee_lines:
+				return
+			for fee_line in json.loads(wc_order.fee_lines):
+
+				# Add line for fee in Taxes and Charges table
+				new_sales_order.append(
+					"taxes",
+					{
+						"charge_type": "Actual",
+						"account_head": wc_server.account_for_order_fee_lines,
+						"tax_amount": fee_line["total"],
+						"description": fee_line["name"],
+					},
+				)
+
+				# Add line for fee's taxes in Taxes and Charges table
+				if fee_line["tax_status"] == "taxable" or len(fee_line["taxes"]) > 0:
+					if not wc_server.tax_account_for_order_fee_lines:
+						frappe.throw(_("Please set 'Tax Account for Order Fee Lines' in WooCommerce Server"))
+
+					for fee_line_tax in fee_line["taxes"]:
+						new_sales_order.append(
+							"taxes",
+							{
+								"charge_type": "Actual",
+								"account_head": wc_server.tax_account_for_order_fee_lines,
+								"tax_amount": fee_line_tax["total"],
+								"description": fee_line["name"] + " " + _("Tax"),
+							},
+						)
 
 	def set_sales_order_item_fields(
 		self, woocommerce_order_line_item: Dict, so_item: Union[SalesOrderItem, Dict]

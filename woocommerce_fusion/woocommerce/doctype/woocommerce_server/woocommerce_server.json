@@ -35,6 +35,7 @@
   "delivery_after_days",
   "uom",
   "section_break_accounting",
+  "enable_tax_lines_sync",
   "tax_account",
   "use_actual_tax_type",
   "sales_taxes_and_charges_template",
@@ -59,6 +60,10 @@
   "order_item_line_fields_section",
   "order_item_fields_warning_html",
   "order_line_item_field_map",
+  "order_fees_section",
+  "enable_order_fees_sync",
+  "account_for_order_fee_lines",
+  "tax_account_for_order_fee_lines",
   "tab_items",
   "item_section",
   "name_by",
@@ -101,7 +106,7 @@
    "label": "Accounting Details"
   },
   {
-   "depends_on": "eval: doc.use_actual_tax_type;",
+   "depends_on": "eval: doc.enable_tax_lines_sync && doc.use_actual_tax_type;",
    "fieldname": "tax_account",
    "fieldtype": "Link",
    "label": "Tax Account",
@@ -182,13 +187,14 @@
   },
   {
    "default": "1",
+   "depends_on": "eval: doc.enable_tax_lines_sync;",
    "description": "If checked, a 'Sales Taxes and Charges' line of type 'Actual' will be added for every WooCommerce Line Item with tax",
    "fieldname": "use_actual_tax_type",
    "fieldtype": "Check",
    "label": "Use 'Actual' Tax Type"
   },
   {
-   "depends_on": "eval: !doc.use_actual_tax_type;",
+   "depends_on": "eval: doc.enable_tax_lines_sync && !doc.use_actual_tax_type;",
    "fieldname": "sales_taxes_and_charges_template",
    "fieldtype": "Link",
    "label": "Sales Taxes and Charges Template",
@@ -545,12 +551,45 @@
    "fieldtype": "Table",
    "label": "Fields Mapping",
    "options": "WooCommerce Server Order Item Field"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_tax_lines_sync",
+   "fieldtype": "Check",
+   "label": "Enable Tax Lines Sync"
+  },
+  {
+   "fieldname": "order_fees_section",
+   "fieldtype": "Section Break",
+   "label": "Order Fees"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_order_fees_sync",
+   "fieldtype": "Check",
+   "label": "Enable Order Fee Lines Sync"
+  },
+  {
+   "depends_on": "eval: doc.enable_order_fees_sync",
+   "fieldname": "account_for_order_fee_lines",
+   "fieldtype": "Link",
+   "label": "Account for Order Fee Lines",
+   "mandatory_depends_on": "eval: doc.enable_order_fees_sync",
+   "options": "Account"
+  },
+  {
+   "depends_on": "eval: doc.enable_order_fees_sync",
+   "description": "If the fee lines have a tax component, allocate it to this GL Account",
+   "fieldname": "tax_account_for_order_fee_lines",
+   "fieldtype": "Link",
+   "label": "Tax Account for Order Fee Lines",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-05-05 17:31:36.634244",
+ "modified": "2025-09-15 05:58:15.105399",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
