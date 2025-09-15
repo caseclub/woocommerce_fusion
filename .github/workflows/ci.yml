@@ -72,12 +72,13 @@ jobs:
       - name: Install Caddy and WP-Playground
         run: |
           # Install Caddy
-          sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+          sudo apt update
+          sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
           curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
           curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
           sudo apt update
-          sudo apt install caddy
-
+          sudo apt install -y caddy
+          
           # Install WP-Playground CLI
           npm install --global @wp-playground/cli
 
@@ -88,20 +89,27 @@ jobs:
       - name: Start WordPress Playground and Caddy
         working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
         run: |
+          echo "--- Generating CI-specific Caddyfile ---"
+          echo -e "{\n\tadmin off\n}\n\nhttps://woo-test.localhost {\n\treverse_proxy 127.0.0.1:9400\n}" > Caddyfile.ci
+          
           echo "--- Starting Caddy ---"
-          # Add a global option to disable the admin API, then start caddy
-          (echo -e "{\n\tadmin off\n}\n" && cat wp_woo_caddy) > Caddyfile.tmp && mv Caddyfile.tmp wp_woo_caddy
-          caddy run --config wp_woo_caddy --adapter caddyfile > caddy.log 2>&1 &
+          caddy run --config Caddyfile.ci > caddy.log 2>&1 &
           
           echo "--- Starting WordPress Playground on port 9400 ---"
-          # Start Playground and explicitly set the port to match the Caddy reverse_proxy
           npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --port=9400 --site-url=https://woo-test.localhost > playground.log 2>&1 &
           
-          echo "--- Waiting for servers to become available ---"
-          # Wait up to 60 seconds for the URL to be ready
-          timeout 60s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done'
+          echo "--- Waiting for servers to become available (up to 60s) ---"
+          # Wait for the server to respond, and dump logs if it fails.
+          timeout 60s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
+            echo "\n\n--- Timeout reached! Server did not start. Displaying logs for debugging: ---"
+            echo "\n--- Caddy Logs (caddy.log) ---"
+            cat caddy.log
+            echo "\n--- WordPress Playground Logs (playground.log) ---"
+            cat playground.log
+            exit 1
+          }
           
-          echo "Servers are up and running!"
+          echo "\nServers are up and running!"
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
@@ -113,15 +121,6 @@ jobs:
           WOO_INTEGRATION_TESTS_WEBSERVER: "https://woo-test.localhost"
           WOO_API_CONSUMER_KEY: "ck_test_123456789"
           WOO_API_CONSUMER_SECRET: "cs_test_abcdefg"
-
-      - name: Display Server Logs on Failure
-        if: failure()
-        working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
-        run: |
-          echo "--- Caddy Logs ---"
-          cat caddy.log
-          echo "--- WordPress Playground Logs ---"
-          cat playground.log
 
       - name: Stop WordPress Playground and Caddy
         if: always()
