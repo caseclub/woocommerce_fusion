@@ -1,9 +1,6 @@
 {
     # Disables the admin endpoint to prevent port 2019 conflicts.
     admin off
-
-    # Disables all automatic HTTPS logic to not listen on port 80
-    auto_https off
 }
 
 https://woo-test.localhost:443 {

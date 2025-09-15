@@ -97,9 +97,9 @@ jobs:
           # Start Playground and explicitly set the port to match the Caddy reverse_proxy.
           npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --port=9400 --site-url=https://woo-test.localhost > playground.log 2>&1 &
           
-          echo "--- Waiting for servers to become available (up to 60s) ---"
+          echo "--- Waiting for servers to become available (up to 240s) ---"
           # Wait for the server to respond, and dump logs if it fails.
-          timeout 480s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
+          timeout 240s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
             echo "\n\n--- Timeout reached! Server did not start. Displaying logs for debugging: ---"
             echo "\n--- Caddy Logs (caddy.log) ---"
             sudo cat caddy.log
