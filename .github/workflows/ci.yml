@@ -69,34 +69,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-              name: InstaWP WordPress Testing
+      - name: Install Caddy and WP-Playground
+        run: |
+          # Install Caddy
+          sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+          sudo apt update
+          sudo apt install caddy
 
-      -   name: Create InstaWP instance
-          uses: instawp/wordpress-testing-automation@main
-          id: create-instawp
-          continue-on-error: true # To avoid "Error: Resource not accessible by integration"
-          with:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              INSTAWP_TOKEN: ${{ secrets.INSTAWP_TOKEN }}
-              INSTAWP_TEMPLATE_SLUG: woocommerce-with-tax-and-variants
-              REPO_ID: 291
-              INSTAWP_ACTION: create-site-template
+          # Install WP-Playground CLI
+          npm install --global @wp-playground/cli
 
-      -   name: Extract InstaWP domain
-          id: extract-instawp-domain                
-          run: |
-              # Check step to ensure instawp_url is not empty
-              if [[ -z "${{ steps.create-instawp.outputs.instawp_url }}" ]]; then
-                echo "instawp_url is empty. Failing the job."
-                exit 1
-              else
-                echo "instawp_url exists: ${{ steps.create-instawp.outputs.instawp_url }}"
-              fi
+      - name: Start WordPress Playground and Caddy
+        run: |
+          # Navigate to app directory to ensure blueprints are found
+          cd frappe-bench/apps/woocommerce_fusion
+          
+          # Start WordPress Playground in the background
+          npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --site-url=https://woo-test.localhost &
+          
+          # Start Caddy in the background
+          caddy run --config wp_woo_caddy --adapter caddyfile &
 
-              instawp_domain="$(echo "${{ steps.create-instawp.outputs.instawp_url }}" | sed -e s#https://##)"
-              echo "instawp-domain=$(echo $instawp_domain)" >> $GITHUB_OUTPUT
+          # Wait for servers to initialize
+          echo "Waiting for servers to start..."
+          sleep 15
 
-      - name: Install
+      - name: Install Frappe Bench
         run: |
           bash ${GITHUB_WORKSPACE}/.github/helper/install.sh
 
@@ -107,26 +107,21 @@ jobs:
           bench --site test_site run-tests --app woocommerce_fusion --coverage
         env:
           TYPE: server
-          WOO_INTEGRATION_TESTS_WEBSERVER: ${{ steps.create-instawp.outputs.instawp_url }}
-          WOO_API_CONSUMER_KEY: ${{ secrets.WOO_API_CONSUMER_KEY }}
-          WOO_API_CONSUMER_SECRET: ${{ secrets.WOO_API_CONSUMER_SECRET }}
+          WOO_INTEGRATION_TESTS_WEBSERVER: "https://woo-test.localhost"
+          WOO_API_CONSUMER_KEY: "ck_test_123456789"
+          WOO_API_CONSUMER_SECRET: "cs_test_abcdefg"
 
-      - name: Destroy InstaWP instance
-        uses: instawp/wordpress-testing-automation@main
-        id: destroy-instawp
-        if: ${{ always() }}
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTAWP_TOKEN: ${{ secrets.INSTAWP_TOKEN }}    
-          INSTAWP_TEMPLATE_SLUG: woocommerce-with-tax-and-variants
-          REPO_ID: 291
-          INSTAWP_ACTION: destroy-site
+      - name: Stop WordPress Playground and Caddy
+        if: always()
+        run: |
+          echo "Cleaning up background processes..."
+          pkill -f caddy
+          pkill -f 'php -S'
 
       - name: Upload coverage data
         uses: codecov/codecov-action@v3
         with:
           name: Backend
           token: ${{ secrets.CODECOV_TOKEN }}
-          # fail_ci_if_error: true
           files: /home/runner/frappe-bench/sites/coverage.xml
           verbose: true
