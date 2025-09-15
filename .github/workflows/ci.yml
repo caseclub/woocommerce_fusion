@@ -44,7 +44,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           check-latest: true
 
       - name: Cache pip
@@ -69,36 +69,46 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-              name: InstaWP WordPress Testing
+      - name: Install Caddy and WP-Playground
+        run: |
+          # Install Caddy
+          sudo apt update
+          sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+          sudo apt update
+          sudo apt install -y caddy
+          
+          # Install WP-Playground CLI
+          npm install --global @wp-playground/cli
 
-      -   name: Create InstaWP instance
-          uses: instawp/wordpress-testing-automation@main
-          id: create-instawp
-          continue-on-error: true # To avoid "Error: Resource not accessible by integration"
-          with:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              INSTAWP_TOKEN: ${{ secrets.INSTAWP_TOKEN }}
-              INSTAWP_TEMPLATE_SLUG: woocommerce-with-tax-and-variants
-              REPO_ID: 291
-              INSTAWP_ACTION: create-site-template
-
-      -   name: Extract InstaWP domain
-          id: extract-instawp-domain                
-          run: |
-              # Check step to ensure instawp_url is not empty
-              if [[ -z "${{ steps.create-instawp.outputs.instawp_url }}" ]]; then
-                echo "instawp_url is empty. Failing the job."
-                exit 1
-              else
-                echo "instawp_url exists: ${{ steps.create-instawp.outputs.instawp_url }}"
-              fi
-
-              instawp_domain="$(echo "${{ steps.create-instawp.outputs.instawp_url }}" | sed -e s#https://##)"
-              echo "instawp-domain=$(echo $instawp_domain)" >> $GITHUB_OUTPUT
-
-      - name: Install
+      - name: Install Frappe Bench
         run: |
           bash ${GITHUB_WORKSPACE}/.github/helper/install.sh
+
+      - name: Start WordPress Playground and Caddy
+        working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
+        run: |
+          echo "--- Starting Caddy with sudo ---"
+          # Use the existing, modified wp_woo_caddy file and run it with root privileges for port 443.
+          sudo caddy run --config wp_woo_caddy --adapter caddyfile > caddy.log 2>&1 &
+          
+          echo "--- Starting WordPress Playground on port 9400 ---"
+          # Start Playground and explicitly set the port to match the Caddy reverse_proxy.
+          npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --port=9400 --site-url=https://woo-test.localhost > playground.log 2>&1 &
+          
+          echo "--- Waiting for servers to become available (up to 240s) ---"
+          # Wait for the server to respond, and dump logs if it fails.
+          timeout 240s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
+            echo "\n\n--- Timeout reached! Server did not start. Displaying logs for debugging: ---"
+            echo "\n--- Caddy Logs (caddy.log) ---"
+            sudo cat caddy.log
+            echo "\n--- WordPress Playground Logs (playground.log) ---"
+            cat playground.log
+            exit 1
+          }
+          
+          echo "\nServers are up and running!"
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
@@ -107,26 +117,22 @@ jobs:
           bench --site test_site run-tests --app woocommerce_fusion --coverage
         env:
           TYPE: server
-          WOO_INTEGRATION_TESTS_WEBSERVER: ${{ steps.create-instawp.outputs.instawp_url }}
-          WOO_API_CONSUMER_KEY: ${{ secrets.WOO_API_CONSUMER_KEY }}
-          WOO_API_CONSUMER_SECRET: ${{ secrets.WOO_API_CONSUMER_SECRET }}
+          DEV_SERVER: 1
+          WOO_INTEGRATION_TESTS_WEBSERVER: "https://woo-test.localhost"
+          WOO_API_CONSUMER_KEY: "ck_test_123456789"
+          WOO_API_CONSUMER_SECRET: "cs_test_abcdefg"
 
-      - name: Destroy InstaWP instance
-        uses: instawp/wordpress-testing-automation@main
-        id: destroy-instawp
-        if: ${{ always() }}
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTAWP_TOKEN: ${{ secrets.INSTAWP_TOKEN }}    
-          INSTAWP_TEMPLATE_SLUG: woocommerce-with-tax-and-variants
-          REPO_ID: 291
-          INSTAWP_ACTION: destroy-site
+      - name: Stop WordPress Playground and Caddy
+        if: always()
+        run: |
+          echo "Cleaning up background processes..."
+          sudo pkill -f caddy
+          sudo pkill -f 'php -S'
 
       - name: Upload coverage data
         uses: codecov/codecov-action@v3
         with:
           name: Backend
           token: ${{ secrets.CODECOV_TOKEN }}
-          # fail_ci_if_error: true
           files: /home/runner/frappe-bench/sites/coverage.xml
           verbose: true

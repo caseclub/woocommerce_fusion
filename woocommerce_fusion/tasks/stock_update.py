@@ -4,6 +4,8 @@ import frappe
 
 from woocommerce_fusion.tasks.utils import APIWithRequestLogging
 
+verify_ssl = not frappe._dev_server
+
 
 def update_stock_levels_for_woocommerce_item(doc, method):
 	if not frappe.flags.in_test:
@@ -95,6 +97,7 @@ def update_stock_levels_on_woocommerce_site(item_code):
 					consumer_secret=wc_server.api_consumer_secret,
 					version="wc/v3",
 					timeout=40,
+					verify_ssl=verify_ssl,
 				)
 
 				# Sum all quantities from select warehouses and round the total down (WooCommerce API doesn't accept float values)

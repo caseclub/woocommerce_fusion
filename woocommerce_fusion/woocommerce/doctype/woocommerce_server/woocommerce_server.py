@@ -16,6 +16,8 @@ from woocommerce_fusion.woocommerce.doctype.woocommerce_order.woocommerce_order 
 )
 from woocommerce_fusion.woocommerce.woocommerce_api import parse_domain_from_url
 
+verify_ssl = not frappe._dev_server
+
 
 class WooCommerceServer(Document):
 	def autoname(self):
@@ -105,6 +107,7 @@ class WooCommerceServer(Document):
 			consumer_secret=self.api_consumer_secret,
 			version="wc/v3",
 			timeout=40,
+			verify_ssl=verify_ssl,
 		)
 		all_providers = wc_api.get("orders/1/shipment-trackings/providers").json()
 		if all_providers:
