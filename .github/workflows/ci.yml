@@ -89,13 +89,12 @@ jobs:
       - name: Start WordPress Playground and Caddy
         working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
         run: |
-          echo "--- Generating CI-specific Caddyfile ---"
-          echo -e "{\n\tadmin off\n}\n\nhttps://woo-test.localhost {\n\treverse_proxy 127.0.0.1:9400\n}" > Caddyfile.ci
-          
-          echo "--- Starting Caddy ---"
-          caddy run --config Caddyfile.ci > caddy.log 2>&1 &
+          echo "--- Starting Caddy with sudo ---"
+          # Use the existing, modified wp_woo_caddy file and run it with root privileges for port 443.
+          sudo caddy run --config wp_woo_caddy --adapter caddyfile > caddy.log 2>&1 &
           
           echo "--- Starting WordPress Playground on port 9400 ---"
+          # Start Playground and explicitly set the port to match the Caddy reverse_proxy.
           npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --port=9400 --site-url=https://woo-test.localhost > playground.log 2>&1 &
           
           echo "--- Waiting for servers to become available (up to 60s) ---"
@@ -103,7 +102,7 @@ jobs:
           timeout 60s bash -c 'until curl -k --output /dev/null --silent --head --fail https://woo-test.localhost; do printf "."; sleep 2; done' || {
             echo "\n\n--- Timeout reached! Server did not start. Displaying logs for debugging: ---"
             echo "\n--- Caddy Logs (caddy.log) ---"
-            cat caddy.log
+            sudo cat caddy.log
             echo "\n--- WordPress Playground Logs (playground.log) ---"
             cat playground.log
             exit 1
