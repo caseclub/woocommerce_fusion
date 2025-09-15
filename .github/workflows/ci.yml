@@ -81,12 +81,13 @@ jobs:
           # Install WP-Playground CLI
           npm install --global @wp-playground/cli
 
-      - name: Start WordPress Playground and Caddy
-        working-directory: /home/runner/frappe-bench
+      - name: Install Frappe Bench
         run: |
-          # Navigate to app directory to ensure blueprints are found
-          cd apps/woocommerce_fusion
-          
+          bash ${GITHUB_WORKSPACE}/.github/helper/install.sh
+
+      - name: Start WordPress Playground and Caddy
+        working-directory: /home/runner/frappe-bench/apps/woocommerce_fusion
+        run: |
           # Start WordPress Playground in the background
           npx @wp-playground/cli server --blueprint wp_woo_blueprint.json --site-url=https://woo-test.localhost &
           
@@ -96,10 +97,6 @@ jobs:
           # Wait for servers to initialize
           echo "Waiting for servers to start..."
           sleep 15
-
-      - name: Install Frappe Bench
-        run: |
-          bash ${GITHUB_WORKSPACE}/.github/helper/install.sh
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
@@ -116,8 +113,9 @@ jobs:
         if: always()
         run: |
           echo "Cleaning up background processes..."
-          pkill -f caddy
-          pkill -f 'php -S'
+          sudo pkill -f caddy
+          # The Playground CLI runs PHP's built-in server.
+          sudo pkill -f 'php -S'
 
       - name: Upload coverage data
         uses: codecov/codecov-action@v3
