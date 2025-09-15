@@ -1,7 +1,16 @@
 {
+    # Disables the admin endpoint to prevent port 2019 conflicts.
     admin off
+
+    # Disables all automatic HTTPS logic to not listen on port 80
+    auto_https off
 }
 
-https://woo-test.localhost {
+https://woo-test.localhost:443 {
+    # Tell Caddy to generate its own self-signed certificate for localhost.
+    # This avoids any external network calls or challenges.
+    tls internal
+
+    # Proxy requests to the Playground instance.
     reverse_proxy 127.0.0.1:9400
 }
