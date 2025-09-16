@@ -198,7 +198,7 @@
    "fieldname": "sales_taxes_and_charges_template",
    "fieldtype": "Link",
    "label": "Sales Taxes and Charges Template",
-   "mandatory_depends_on": "eval: !doc.use_actual_tax_type;",
+   "mandatory_depends_on": "eval: doc.enable_tax_lines_sync && !doc.use_actual_tax_type;",
    "options": "Sales Taxes and Charges Template"
   },
   {
@@ -589,7 +589,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-15 05:58:15.105399",
+ "modified": "2025-09-16 09:19:45.966043",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
