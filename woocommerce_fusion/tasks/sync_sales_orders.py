@@ -661,12 +661,15 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
 				found_item = frappe.get_doc("Item", item_codes[0].parent) if item_codes else None
 
+			rate = item.get("price")
 			# If we are applying a Sales Taxes and Charges Template (as opposed to Actual Tax), then we need to
 			# determine if the item price should include tax or not
 			if wc_server.enable_tax_lines_sync and not wc_server.use_actual_tax_type:
 				tax_template = frappe.get_cached_doc(
 					"Sales Taxes and Charges Template", wc_server.sales_taxes_and_charges_template
 				)
+				if tax_template.taxes[0].included_in_print_rate:
+					rate = get_tax_inc_price_for_woocommerce_line_item(item)
 
 			new_sales_order_line = {
 				"item_code": found_item.name,
@@ -674,9 +677,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 				"description": found_item.item_name,
 				"delivery_date": new_sales_order.delivery_date,
 				"qty": item.get("quantity"),
-				"rate": item.get("price")
-				if wc_server.use_actual_tax_type or not tax_template.taxes[0].included_in_print_rate
-				else get_tax_inc_price_for_woocommerce_line_item(item),
+				"rate": rate,
 				"warehouse": wc_server.warehouse,
 				"discount_percentage": 100 if item.get("price") == 0 else 0,
 			}
