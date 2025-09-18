@@ -66,9 +66,9 @@ caddy run --config wp_woo_caddy --adapter caddyfile
 
 4. Set the correct environment variables and run the tests
 ```shell
-export WOO_INTEGRATION_TESTS_WEBSERVER = "https://woo-test.localhost"
-export WOO_API_CONSUMER_KEY = "ck_test_123456789"
-export WOO_API_CONSUMER_SECRET = "cs_test_abcdefg"
+export WOO_INTEGRATION_TESTS_WEBSERVER="https://woo-test.localhost"
+export WOO_API_CONSUMER_KEY="ck_test_123456789"
+export WOO_API_CONSUMER_SECRET="cs_test_abcdefg"
 bench --site test_site run-tests --app woocommerce_fusion --coverage
 ```
 
