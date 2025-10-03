@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import traceback
 
 import frappe
+from frappe import _
+
 
 def execute():
 	"""
@@ -17,7 +19,11 @@ def execute():
 			wc_server_doc = frappe.get_doc("WooCommerce Server", wc_server.name)
 			if wc_server_doc.tax_account:
 				frappe.db.set_value(
-					"WooCommerce Server", wc_server.name, "f_n_f_tax_account", wc_server_doc.tax_account, update_modified=False
+					"WooCommerce Server",
+					wc_server.name,
+					"f_n_f_tax_account",
+					wc_server_doc.tax_account,
+					update_modified=False,
 				)
 
 	except Exception as err:
