@@ -41,6 +41,7 @@
   "sales_taxes_and_charges_template",
   "column_break_4b4vn",
   "f_n_f_account",
+  "f_n_f_tax_account",
   "section_payments_sync",
   "enable_payments_sync",
   "ignore_date_paid",
@@ -584,12 +585,20 @@
    "fieldtype": "Link",
    "label": "Tax Account for Order Fee Lines",
    "options": "Account"
+  },
+  {
+   "description": "Account Head for Shipping Tax",
+   "fieldname": "f_n_f_tax_account",
+   "fieldtype": "Link",
+   "label": "Freight and Forwarding Tax Account",
+   "options": "Account",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-16 09:19:45.966043",
+ "modified": "2025-10-03 10:52:27.751479",
  "modified_by": "Administrator",
  "module": "WooCommerce",
  "name": "WooCommerce Server",
