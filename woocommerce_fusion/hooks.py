@@ -1,3 +1,8 @@
+#/apps/woocomerce_fusion/woocomerce_fusion
+#After updating hooks.py, reload it with in bench via
+# 1) bench restart
+# 2) bench --site erp.caseclub.com migrate
+# Check status by search in erpNext UI: Scheduled Job Type List
 app_name = "woocommerce_fusion"
 app_title = "WooCommerce Fusion"
 app_publisher = "Dirk van der Laarse"
@@ -27,7 +32,10 @@ app_license = "GNU GPLv3"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Sales Order": "public/js/selling/sales_order.js", "Item": "public/js/stock/item.js"}
+doctype_js = {
+    "Sales Order": "public/js/selling/sales_order.js",
+#    "Item": "public/js/stock/item.js" # When ready to add logic so erpnext can update woocommerce pricing
+}
 doctype_list_js = {"Sales Order": "public/js/selling/sales_order_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -40,7 +48,7 @@ doctype_list_js = {"Sales Order": "public/js/selling/sales_order_list.js"}
 
 # website user home page (by Role)
 # role_home_page = {
-# 	"Role": "home_page"
+#     "Role": "home_page"
 # }
 
 # Generators
@@ -54,8 +62,8 @@ doctype_list_js = {"Sales Order": "public/js/selling/sales_order_list.js"}
 
 # add methods and filters to jinja environment
 # jinja = {
-# 	"methods": "woocommerce_fusion.utils.jinja_methods",
-# 	"filters": "woocommerce_fusion.utils.jinja_filters"
+#     "methods": "woocommerce_fusion.utils.jinja_methods",
+#     "filters": "woocommerce_fusion.utils.jinja_filters"
 # }
 
 # Installation
@@ -81,82 +89,83 @@ doctype_list_js = {"Sales Order": "public/js/selling/sales_order_list.js"}
 # Permissions evaluated in scripted ways
 
 # permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
+#     "Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
 #
 # has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
+#     "Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
 # DocType Class
 # ---------------
 # Override standard doctype classes
 
-override_doctype_class = {
-	"Sales Order": "woocommerce_fusion.overrides.selling.sales_order.CustomSalesOrder",
-}
+#override_doctype_class = {
+#    "Sales Order": "woocommerce_fusion.overrides.selling.sales_order.CustomSalesOrder", # Caution uncommenting this will prevent the override in eseller suite from triggering which is needed to auot generate sales invoices against amazon imported sales orders. Only a single override will work at a time.
+#}
 
 # Document Events
 # ---------------
 # Hook on document methods and events
 
 # doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
+#     "*": {
+#         "on_update": "method",
+#         "on_cancel": "method",
+#         "on_trash": "method"
+#     }
 # }
 doc_events = {
-	"Stock Entry": {
-		"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-		"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-	},
-	"Stock Reconciliation": {
-		"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-		"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-	},
-	"Sales Invoice": {
-		"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-		"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-	},
-	"Delivery Note": {
-		"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-		"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
-	},
-	"Item Price": {
-		"on_update": "woocommerce_fusion.tasks.sync_item_prices.update_item_price_for_woocommerce_item_from_hook"
-	},
-	"Sales Order": {
-		"on_submit": "woocommerce_fusion.tasks.sync_sales_orders.run_sales_order_sync_from_hook"
-	},
-	"Item": {
-		"on_update": "woocommerce_fusion.tasks.sync_items.run_item_sync_from_hook",
-		"after_insert": "woocommerce_fusion.tasks.sync_items.run_item_sync_from_hook",
-	},
+    "Stock Entry": {
+        #"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+        #"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+    },
+    "Stock Reconciliation": {
+        #"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+        #"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+    },
+    "Sales Invoice": {
+        #"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+        #"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+    },
+    "Delivery Note": {
+        #"on_submit": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+        #"on_cancel": "woocommerce_fusion.tasks.stock_update.update_stock_levels_for_woocommerce_item",
+    },
+    "Item Price": {
+        #"on_update": "woocommerce_fusion.tasks.sync_item_prices.update_item_price_for_woocommerce_item_from_hook"
+    },
+    "Sales Order": {
+        #"on_submit": "woocommerce_fusion.tasks.sync_sales_orders.run_sales_order_sync_from_hook"
+    },
+    "Item": {
+        #"on_update": "woocommerce_fusion.tasks.sync_items.run_item_sync_from_hook",
+        #"after_insert": "woocommerce_fusion.tasks.sync_items.run_item_sync_from_hook",
+    },
 }
 
 # Scheduled Tasks
 # ---------------
 
 scheduler_events = {
-	# 	"all": [
-	# 		"woocommerce_fusion.tasks.all"
-	# 	],
-	# 	"weekly": [
-	# 		"woocommerce_fusion.tasks.daily"
-	# 	],
-	"hourly_long": [
-		"woocommerce_fusion.tasks.sync_sales_orders.sync_woocommerce_orders_modified_since",
-		"woocommerce_fusion.tasks.sync_items.sync_woocommerce_products_modified_since",
-	],
-	"daily_long": [
-		"woocommerce_fusion.tasks.stock_update.update_stock_levels_for_all_enabled_items_in_background",
-		"woocommerce_fusion.tasks.sync_item_prices.run_item_price_sync_in_background",
-	],
-	# 	"monthly": [
-	# 		"woocommerce_fusion.tasks.monthly"
-	# 	],
+    #     "all": [
+    #         "woocommerce_fusion.tasks.all"
+    #     ],
+    #     "weekly": [
+    #         "woocommerce_fusion.tasks.daily"
+    #     ],
+    "hourly_long": [
+        "woocommerce_fusion.tasks.sync_sales_orders.sync_woocommerce_orders_modified_since", # Import orders from woocommerce into erpnext
+        "woocommerce_fusion.tasks.sync_sales_orders.sync_erpnext_to_woocommerce_orders",     # Update woocommerce orders & tracking numbers based on erpNext Status (currently only "Completed" is supported)
+        "woocommerce_fusion.tasks.sync_sales_orders.clear_credit_card_clearing",             # Transfer credit card clearing account funds to bank of america
+    ],
+    "daily_long": [
+        #"woocommerce_fusion.tasks.stock_update.update_stock_levels_for_all_enabled_items_in_background",
+        #"woocommerce_fusion.tasks.sync_item_prices.run_item_price_sync_in_background",
+    ],
+    #     "monthly": [
+    #         "woocommerce_fusion.tasks.monthly"
+    #     ],
 }
 
 # Testing
@@ -174,7 +183,7 @@ before_tests = "woocommerce_fusion.setup.utils.before_tests"
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
-# 	"Task": "woocommerce_fusion.task.get_dashboard_data"
+#     "Task": "woocommerce_fusion.task.get_dashboard_data"
 # }
 
 # exempt linked doctypes from being automatically cancelled
@@ -185,7 +194,7 @@ before_tests = "woocommerce_fusion.setup.utils.before_tests"
 # -----------------------------------------------------------
 
 ignore_links_on_delete = [
-	"WooCommerce Request Log",
+    "WooCommerce Request Log",
 ]
 
 # Request Events
@@ -202,63 +211,63 @@ ignore_links_on_delete = [
 # --------------------
 
 # user_data_fields = [
-# 	{
-# 		"doctype": "{doctype_1}",
-# 		"filter_by": "{filter_by}",
-# 		"redact_fields": ["{field_1}", "{field_2}"],
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_2}",
-# 		"filter_by": "{filter_by}",
-# 		"partial": 1,
-# 	},
-# 	{
-# 		"doctype": "{doctype_3}",
-# 		"strict": False,
-# 	},
-# 	{
-# 		"doctype": "{doctype_4}"
-# 	}
+#     {
+#         "doctype": "{doctype_1}",
+#         "filter_by": "{filter_by}",
+#         "redact_fields": ["{field_1}", "{field_2}"],
+#         "partial": 1,
+#     },
+#     {
+#         "doctype": "{doctype_2}",
+#         "filter_by": "{filter_by}",
+#         "partial": 1,
+#     },
+#     {
+#         "doctype": "{doctype_3}",
+#         "strict": False,
+#     },
+#     {
+#         "doctype": "{doctype_4}"
+#     }
 # ]
 
 # Authentication and authorization
 # --------------------------------
 
 # auth_hooks = [
-# 	"woocommerce_fusion.auth.validate"
+#     "woocommerce_fusion.auth.validate"
 # ]
 
 
 fixtures = [
-	{
-		"dt": "Custom Field",
-		"filters": [
-			[
-				"name",
-				"in",
-				(
-					"Customer-woocommerce_server",
-					"Customer-woocommerce_identifier",
-					"Customer-woocommerce_is_guest",
-					"Sales Order-woocommerce_id",
-					"Sales Order-woocommerce_server",
-					"Sales Order-woocommerce_status",
-					"Sales Order-woocommerce_payment_method",
-					"Sales Order-woocommerce_shipment_tracking_html",
-					"Sales Order-woocommerce_payment_entry",
-					"Sales Order-custom_attempted_woocommerce_auto_payment_entry",
-					"Sales Order-custom_woocommerce_last_sync_hash",
-					"Sales Order-custom_woocommerce_customer_note",
-					"Address-woocommerce_identifier",
-					"Item-woocommerce_servers",
-					"Item-custom_woocommerce_tab",
-				),
-			]
-		],
-	}
+    {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "name",
+                "in",
+                (
+                    "Customer-woocommerce_server",
+                    "Customer-woocommerce_identifier",
+                    "Customer-woocommerce_is_guest",
+                    "Sales Order-woocommerce_id",
+                    "Sales Order-woocommerce_server",
+                    "Sales Order-woocommerce_status",
+                    "Sales Order-woocommerce_payment_method",
+                    "Sales Order-woocommerce_shipment_tracking_html",
+                    "Sales Order-woocommerce_payment_entry",
+                    "Sales Order-custom_attempted_woocommerce_auto_payment_entry",
+                    "Sales Order-custom_woocommerce_last_sync_hash",
+                    "Sales Order-custom_woocommerce_customer_note",
+                    "Address-woocommerce_identifier",
+                    "Item-woocommerce_servers",
+                    "Item-custom_woocommerce_tab",
+                ),
+            ]
+        ],
+    }
 ]
 
 default_log_clearing_doctypes = {
-	"WooCommerce Request Log": 7,
+    "WooCommerce Request Log": 7,
 }

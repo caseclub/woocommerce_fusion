@@ -1,8 +1,15 @@
 // Override ERPNext List View Settings for Sales Order
 // See erpnext/selling/doctype/sales_order/sales_order_list.js
+// /apps/woocommerce_fusion/woocommerce_fusion/public/js/selling
+
+//After updating:
+//bench build
+//bench --site erp.caseclub.com clear-cache
+//bench restart
+
 frappe.listview_settings['Sales Order'] = {
 	add_fields: ["woocommerce_status", "base_grand_total", "customer_name", "currency", "delivery_date",
-		"per_delivered", "per_billed", "status", "order_type", "name", "skip_delivery_note"],
+		"per_delivered", "per_billed", "status", "order_type", "name", "skip_delivery_note"],				
 	get_indicator: function (doc) {
 		if (doc.status === "Closed") {
 			// Closed
@@ -18,7 +25,7 @@ frappe.listview_settings['Sales Order'] = {
 			///////////////////////////////////////////////////////////////////////////////////////
 			if (doc.advance_paid >= doc.grand_total) {
 				// not delivered & not billed
-				return [__("Paid in Advance"), "grey",
+				return [__("Paid in Advance"), "blue",
 					"advance_paid,>=,grand_total"];
 			} else
 			///////////////////////////////////////////////////////////////////////////////////////
@@ -61,9 +68,9 @@ frappe.listview_settings['Sales Order'] = {
 				'On hold': 'grey',
 				'Failed': 'yellow',
 				'Cancelled': 'red',
-				'Processing': 'pink',
+				'Processing': 'blue',
 				'Refunded': 'grey',
-				'Shipped': 'light-blue',
+				'Shipped': 'green',
 				'Ready for Pickup': 'yellow',
 				'Picked up': 'light-green',
 				'Delivered': 'green',
@@ -72,6 +79,9 @@ frappe.listview_settings['Sales Order'] = {
 				'Quote Sent': 'grey',
 				'Trash': 'red',
 				'Partially Shipped': 'light-blue',
+				'Sent to FBA': 'gray',  // Matches "Shipped" for fulfillment progress
+				'FBA Withheld': 'yellow',     // Caution/warning like "Failed" or "Ready for Pickup"
+				'Failed to FBA': 'red'        // Alert/failure like "Cancelled"
 			}
 			const color = statusToColorMap[val] || ""
 			return `
@@ -104,7 +114,6 @@ frappe.listview_settings['Sales Order'] = {
 
 		listview.page.add_action_item(__("Advance Payment"), ()=>{
 			erpnext.bulk_transaction_processing.create(listview, "Sales Order", "Payment Entry");
-		});
-
+		});		
 	}
 };
