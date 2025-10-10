@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Dict, Optional, Tuple, Union
 import pytz
 
@@ -548,15 +549,15 @@ frappe.call("woocommerce_fusion.tasks.sync_sales_orders.clear_credit_card_cleari
 # Transfer total creidt card clearing account balance to bank of america account once per day at 9m when the settlement happens (elevon credit card processor does not have an api so we must clear blindly)
 def clear_credit_card_clearing():
     """
-    Run nightly at 9 PM: Transfer balance from Credit Card Clearing to Bank of America account via Internal Transfer Payment Entry.
+    Run nightly at 9 PM PST/PDT: Transfer balance from Credit Card Clearing to Bank of America account via Internal Transfer Payment Entry.
+    Uses ZoneInfo for time zone handling; assumes server clock is accurate.
     """
-    # Get ERPNext's system time zone (e.g., 'America/New_York'); update in System Settings if wrong
-    system_tz_str = frappe.db.get_single_value("System Settings", "time_zone")
-    system_tz = pytz.timezone(system_tz_str)
-    now = datetime.now(system_tz)
+    # Get current time in PST/PDT (handles DST automatically)
+    pst_tz = ZoneInfo("America/Los_Angeles")
+    now_pst = datetime.now(tz=pst_tz)
 
-    if now.hour != 21:
-        return  # Only run at 9 PM in system time zone
+    if now_pst.hour != 21:
+        return  # Only run at 9 PM PST/PDT
 
     wc_servers = frappe.get_all("WooCommerce Server", filters={"enable_sync": 1}, limit=1)  # Adjust filter if needed (e.g., by name)
     if not wc_servers:
@@ -573,7 +574,7 @@ def clear_credit_card_clearing():
         frappe.log_error("Company not found for account", clearing_account)
         return
 
-    balance = get_balance_on(account=clearing_account, date=now.date(), company=company)
+    balance = get_balance_on(account=clearing_account, date=now_pst.date(), company=company)
     if balance <= 0:
         return  # No positive balance to transfer (or log if negative)
 
@@ -583,7 +584,7 @@ def clear_credit_card_clearing():
     pe = frappe.new_doc("Payment Entry")
     pe.payment_type = "Internal Transfer"
     pe.company = company
-    pe.posting_date = now.date()
+    pe.posting_date = now_pst.date()
     pe.mode_of_payment = mode_of_payment
     pe.paid_from = clearing_account
     pe.paid_from_account_currency = currency
@@ -591,8 +592,8 @@ def clear_credit_card_clearing():
     pe.paid_to_account_currency = currency
     pe.paid_amount = balance
     pe.received_amount = balance
-    pe.reference_no = f"Credit Card Batch Settlement {now.strftime('%Y-%m-%d')} - Nightly Clearing"
-    pe.reference_date = now.date()
+    pe.reference_no = f"Credit Card Batch Settlement {now_pst.strftime('%Y-%m-%d')} - Nightly Clearing"
+    pe.reference_date = now_pst.date()
 
     pe.flags.ignore_mandatory = True
     pe.insert()
