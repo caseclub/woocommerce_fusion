@@ -1434,6 +1434,12 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
                 if item_codes:
                     found_item = frappe.get_doc("Item", item_codes[0].parent)
+                    # Auto-enable is_sales_item for mapped items to fix validation errors during Sales Order sync.
+                    if not found_item.is_sales_item:
+                        found_item.is_sales_item = 1
+                        found_item.flags.ignore_permissions = True
+                        found_item.save()
+                        found_item.reload()  # Refresh to ensure updated state
                 else:
                     product_name = wc_item.get("name", "Unknown Product")
                     raise WooCommerceMissingItemError(woocomm_item_id, new_sales_order.woocommerce_server, product_name, wc_order.id)
