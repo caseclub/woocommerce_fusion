@@ -784,6 +784,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
             if not sales_order.woocommerce_payment_entry:
                 if self.create_and_link_payment_entry(woocommerce_order, sales_order):
+                    sales_order.reload()  # Reload after PE to sync timestamps                    
                     so_dirty = True
 
             if so_dirty:
@@ -1093,6 +1094,16 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             else wc_order.payment_method
         )
         new_sales_order.woocommerce_payment_method = payment_method
+        
+        # ⚠️ Do NOT uncomment — setting payment_terms_template here causes Sales Invoice due-date validation errors (ERPNext enforces template rules, leading to “Due / Reference Date cannot be after …”)
+        # Map to ERPNext payment terms template based on WooCommerce Payment Method Title
+#         if payment_method == "Amazon Pay":
+#             new_sales_order.payment_terms_template = "AMAZON PAY"
+#         elif payment_method == "Credit Card":
+#             new_sales_order.payment_terms_template = "CREDIT CARD"
+
+        created_date = wc_order.date_created.split("T")       
+        
         created_date = wc_order.date_created.split("T")
         new_sales_order.transaction_date = created_date[0]
         delivery_after = wc_server.delivery_after_days or 7
