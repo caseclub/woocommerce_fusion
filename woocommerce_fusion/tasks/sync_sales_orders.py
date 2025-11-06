@@ -1143,19 +1143,24 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         new_sales_order.custom_billing_address_title = get_address_title(new_sales_order.customer_address) or ''
         new_sales_order.custom_shipping_address_title = get_address_title(new_sales_order.shipping_address_name) or ''
 
-        new_sales_order.flags.ignore_mandatory = True
-        new_sales_order.flags.created_by_sync = True
-        safe_insert(new_sales_order)
-        new_sales_order.reload()
-
-        # Set hash before submit
-        new_sales_order.custom_woocommerce_last_sync_hash = wc_order.woocommerce_date_modified
-        new_sales_order.save()
-        new_sales_order.reload()
-
-        if wc_server.submit_sales_orders:
-            safe_submit(new_sales_order)
+        try:
+            new_sales_order.flags.ignore_mandatory = True
+            new_sales_order.flags.created_by_sync = True
+            safe_insert(new_sales_order)
             new_sales_order.reload()
+
+            # Set hash before submit
+            new_sales_order.custom_woocommerce_last_sync_hash = wc_order.woocommerce_date_modified
+            new_sales_order.save()
+            new_sales_order.reload()
+
+            if wc_server.submit_sales_orders:
+                safe_submit(new_sales_order)
+                new_sales_order.reload()
+        except Exception as e:
+            error_msg = f"Failed to create/submit SO for WC Order {wc_order.id}: {str(e)}\nItem details may require supplier when drop ship is enabled."
+            frappe.log_error("WooCommerce SO Creation Error", error_msg)
+            raise  # Re-raise to maintain existing behavior
 
         # Create PE if conditions met; use db_set for links/flags (no .save() on submitted SO)
         pe_created, pe_name, attempted_flag = self.create_and_link_payment_entry(wc_order, new_sales_order)
@@ -1427,6 +1432,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             # Deleted items will have a "0" for variation_id/product_id
             if woocomm_item_id == 0 or woocomm_item_id == "0":
                 found_item = create_placeholder_item(new_sales_order)
+                is_drop_ship = 0
+                supplier = None
             else:
                 iws = frappe.qb.DocType("Item WooCommerce Server")
                 itm = frappe.qb.DocType("Item")
@@ -1451,6 +1458,17 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                         found_item.flags.ignore_permissions = True
                         found_item.save()
                         found_item.reload()  # Refresh to ensure updated state
+                        
+                    # Check for custom_is_drop_ship in Item WooCommerce Server child table
+                    is_drop_ship = 0
+                    supplier = None
+                    for iws in found_item.woocommerce_servers:
+                        if iws.woocommerce_server == new_sales_order.woocommerce_server and iws.custom_is_drop_ship:
+                            is_drop_ship = 1
+                            # Look up the first supplier from Item's suppliers child table
+                            if found_item.supplier_items:
+                                supplier = found_item.supplier_items[0].supplier
+                            break  # Stop after finding the matching server entry
                 else:
                     product_name = wc_item.get("name", "Unknown Product")
                     raise WooCommerceMissingItemError(woocomm_item_id, new_sales_order.woocommerce_server, product_name, wc_order.id)
@@ -1490,6 +1508,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 if wc_server.use_actual_tax_type or not tax_template.taxes[0].included_in_print_rate
                 else get_tax_inc_price_for_woocommerce_line_item(wc_item),
                 "warehouse": item_warehouse,
+                "delivered_by_supplier": is_drop_ship,
+                "supplier": supplier,
                 "discount_percentage": 100 if wc_item.get("price") == 0 else 0,
             }
 
@@ -2004,3 +2024,4 @@ def get_contacts_linking_to(doctype, docname, fields=None):
             ["Dynamic Link", "parenttype", "=", "Contact"],
         ],
     )
+
