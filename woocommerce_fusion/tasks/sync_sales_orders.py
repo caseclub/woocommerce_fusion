@@ -1429,6 +1429,15 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             else:
                 woocomm_item_id = product_id
 
+            # Custom logic for splitting WooCommerce ID 125127 (Solid Flat Foam) based on description
+            if str(woocomm_item_id) == '125127':
+                desc = wc_item.get("name", "").lower()
+                if "polyethylene" in desc:
+                    woocomm_item_id = "125127-PE"
+                elif "polyurethane" in desc:
+                    woocomm_item_id = "125127-PU"
+                # If neither keyword is found, woocomm_item_id remains unchanged
+
             # Deleted items will have a "0" for variation_id/product_id
             if woocomm_item_id == 0 or woocomm_item_id == "0":
                 found_item = create_placeholder_item(new_sales_order)
