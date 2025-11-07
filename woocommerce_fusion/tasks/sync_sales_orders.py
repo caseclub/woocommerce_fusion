@@ -312,6 +312,8 @@ def sync_erpnext_to_woocommerce_orders():
             wc_order_dirty = False  # Reset flag for this order
 
             original_wc_status = wc_order.status  # Save original for comparison
+            
+            added_new = False
 
             # Update WC status if needed
             if erpnext_wc_status != wc_order.status:
