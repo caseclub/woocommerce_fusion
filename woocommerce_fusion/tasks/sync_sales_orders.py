@@ -475,6 +475,19 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         if not frappe.db.exists(doctype, reference_no):
             return True  # Ignore if not found, treat as success
         doc = frappe.get_doc(doctype, reference_no)
+        
+        # Auto-submit draft Sales Order or Sales Invoice before applying payment
+        if doctype in ["Sales Order", "Sales Invoice"] and doc.docstatus == 0:
+            try:
+                doc.flags.ignore_mandatory = True  # Bypass any non-critical validations if needed
+                doc.submit()
+                doc.load_from_db()  # Reload to ensure updated state (e.g., docstatus=1, any triggered updates)
+                frappe.db.commit()  # Ensure changes are committed
+            except Exception as e:
+                error_msg = f"Failed to auto-submit draft {doctype} {reference_no} for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
+                frappe.log_error(f"WooCommerce Auto-Submit {doctype} Error", error_msg)
+                return False  # Bail out if submission fails to avoid invalid PE insert 
+ 
         outstanding = doc.outstanding_amount if doctype == "Sales Invoice" else (doc.rounded_total - doc.advance_paid)
         if outstanding <= 0:
             return True  # Already fully paid; treat as success
