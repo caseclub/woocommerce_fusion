@@ -482,6 +482,11 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         if doctype in ["Sales Order", "Sales Invoice"] and doc.docstatus == 0:
             try:
                 doc.flags.ignore_mandatory = True  # Bypass any non-critical validations if needed
+                # Clear payment_terms_template on draft SO/SI to avoid due date conflicts during submit/SI creation
+                if doctype in ["Sales Order", "Sales Invoice"] and doc.payment_terms_template:
+                    doc.payment_terms_template = None  # Remove terms to prevent validation errors
+                    doc.save(ignore_permissions=True)  # Save the change before submit
+                    doc.load_from_db()  # Reload to ensure the field is cleared
                 doc.submit()
                 doc.load_from_db()  # Reload to ensure updated state (e.g., docstatus=1, any triggered updates)
                 frappe.db.commit()  # Ensure changes are committed
