@@ -466,7 +466,9 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         reference_no = desc.split("Online Payment for Invoice / Reference #:")[-1].strip()
         #print(reference_no)
         # Determine doctype
-        if reference_no.startswith("SO"):
+        if reference_no.startswith("Q"):
+            doctype = "Quotation"
+        elif reference_no.startswith("SO"):
             doctype = "Sales Order"
         elif reference_no.startswith("INV"):
             doctype = "Sales Invoice"
@@ -478,16 +480,110 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
             return True  # Ignore if not found, treat as success
         doc = frappe.get_doc(doctype, reference_no)
         
+        # Handle Quotation by creating and submitting a Sales Order from it
+        if doctype == "Quotation":
+            try:
+                from erpnext.selling.doctype.quotation.quotation import make_sales_order
+                
+                # Load Quotation
+                quot = frappe.get_doc("Quotation", reference_no)
+                
+                # Auto-submit draft Quotation before creating SO
+                if quot.docstatus == 0:
+                    try:
+                        quot.flags.ignore_mandatory = True
+                        # Clear payment terms if any (moved from below to here for drafts)
+                        original_quot_terms = quot.payment_terms_template
+                        if quot.payment_terms_template:
+                            quot.payment_terms_template = None
+                        if hasattr(quot, "payment_schedule"):
+                            quot.payment_schedule = []
+                        quot.save(ignore_permissions=True)
+                        quot.load_from_db()
+                        
+                        # Temporarily clear customer's payment_terms
+                        original_cust_terms = frappe.db.get_value("Customer", quot.party_name, "payment_terms")  # Note: Quotation uses party_name, not customer
+                        try:
+                            frappe.db.set_value("Customer", quot.party_name, "payment_terms", None)
+                            quot.submit()
+                        finally:
+                            frappe.db.set_value("Customer", quot.party_name, "payment_terms", original_cust_terms)
+                            if original_quot_terms:
+                                frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
+                            frappe.db.commit()
+                        
+                        quot.load_from_db()  # Reload after submission
+                    except Exception as e:
+                        error_msg = f"Failed to auto-submit draft Quotation {reference_no} for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
+                        frappe.log_error(f"WooCommerce Auto-Submit Quotation Error", error_msg)
+                        return False
+                
+                # Temporarily clear payment terms on Quotation to avoid inheritance issues
+                original_quot_terms = quot.payment_terms_template
+                if quot.payment_terms_template:
+                    quot.payment_terms_template = None
+                    quot.save(ignore_permissions=True)
+                    quot.load_from_db()
+                
+                # Create Sales Order from Quotation
+                so = make_sales_order(quot.name)
+                
+                # Temporarily clear payment terms on new SO (mirroring existing logic)
+                original_so_terms = so.payment_terms_template
+                if so.payment_terms_template:
+                    so.payment_terms_template = None
+                if hasattr(so, "payment_schedule"):
+                    so.payment_schedule = []
+                so.save(ignore_permissions=True)
+                so.load_from_db()
+                
+                # Temporarily clear customer's payment_terms to prevent inheritance during submit
+                original_cust_terms = frappe.db.get_value("Customer", so.customer, "payment_terms")
+                try:
+                    frappe.db.set_value("Customer", so.customer, "payment_terms", None)
+                    so.flags.ignore_mandatory = True
+                    so.submit()
+                finally:
+                    # Restore original terms
+                    frappe.db.set_value("Customer", so.customer, "payment_terms", original_cust_terms)
+                    if original_quot_terms:
+                        frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
+                    if original_so_terms:
+                        frappe.db.set_value("Sales Order", so.name, "payment_terms_template", original_so_terms)
+                    frappe.db.commit()
+                
+                so.load_from_db()  # Reload to ensure updated state
+                
+                # Switch doctype/reference to the new SO for payment application
+                doctype = "Sales Order"
+                reference_no = so.name
+                doc = so  # Update doc reference for outstanding calculation below
+                
+            except Exception as e:
+                error_msg = f"Failed to create/submit SO from Quotation {reference_no} for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
+                frappe.log_error(f"WooCommerce Quotation to SO Error", error_msg)
+                return False  # Bail out if creation fails        
+        
         # Auto-submit draft Sales Order or Sales Invoice before applying payment
-        if doctype in ["Sales Order", "Sales Invoice"] and doc.docstatus == 0:
+        if doctype in ["Sales Order", "Sales Invoice"] and doc.docstatus == 0: # Quotation handled separately above
             try:
                 doc.flags.ignore_mandatory = True  # Bypass any non-critical validations if needed
-                # Clear payment_terms_template on draft SO/SI to avoid due date conflicts during submit/SI creation
+                # Clear payment_terms_template and payment_schedule on draft SO/SI to avoid due date conflicts during submit/SI creation
                 if doctype in ["Sales Order", "Sales Invoice"] and doc.payment_terms_template:
                     doc.payment_terms_template = None  # Remove terms to prevent validation errors
+                if hasattr(doc, "payment_schedule"):
+                    doc.payment_schedule = []                    
                     doc.save(ignore_permissions=True)  # Save the change before submit
                     doc.load_from_db()  # Reload to ensure the field is cleared
-                doc.submit()
+                # Temporarily clear customer's payment_terms to prevent SI from inheriting during set_missing_values
+                original_terms = frappe.db.get_value("Customer", doc.customer, "payment_terms")
+                try:
+                    frappe.db.set_value("Customer", doc.customer, "payment_terms", None)
+                    doc.submit()
+                finally:
+                    frappe.db.set_value("Customer", doc.customer, "payment_terms", original_terms)
+                    frappe.db.commit()  # Ensure the restore is committed immediately
+
                 doc.load_from_db()  # Reload to ensure updated state (e.g., docstatus=1, any triggered updates)
                 frappe.db.commit()  # Ensure changes are committed
             except Exception as e:
@@ -913,7 +1009,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                         reference_name = si_item_details[0].parent
                         total_amount = sales_order.grand_total  # Note: This might need adjustment if multiple SIs
 
-                # NEW: Check outstanding amount before creating PE to avoid duplicates/errors
+                # Check outstanding amount before creating PE to avoid duplicates/errors
                 if reference_doctype == "Sales Order":
                     so_values = frappe.db.get_value("Sales Order", reference_name, ["rounded_total", "advance_paid"], as_dict=True) or {}
                     outstanding = so_values.get("rounded_total", 0) - so_values.get("advance_paid", 0)
