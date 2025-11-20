@@ -505,9 +505,11 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                         original_cust_terms = frappe.db.get_value("Customer", quot.party_name, "payment_terms")  # Note: Quotation uses party_name, not customer
                         try:
                             frappe.db.set_value("Customer", quot.party_name, "payment_terms", None)
+                            frappe.clear_cache(doctype="Customer")
                             quot.submit()
                         finally:
                             frappe.db.set_value("Customer", quot.party_name, "payment_terms", original_cust_terms)
+                            frappe.clear_cache(doctype="Customer")
                             if original_quot_terms:
                                 frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
                             frappe.db.commit()
@@ -520,13 +522,32 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 
                 # Temporarily clear payment terms on Quotation to avoid inheritance issues
                 original_quot_terms = quot.payment_terms_template
-                if quot.payment_terms_template:
-                    quot.payment_terms_template = None
-                    quot.save(ignore_permissions=True)
-                    quot.load_from_db()
-                
+                if original_quot_terms:
+                    frappe.db.set_value("Quotation", quot.name, "payment_terms_template", None)
+                    frappe.db.commit()  # Ensure the change is committed and visible
+
                 # Create Sales Order from Quotation
                 so = make_sales_order(quot.name)
+
+                # Set delivery date based on item groups (patch addition)
+                wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
+                extended_group = wc_server.custom_extended_delivery_date_item_group
+                has_extended = any(
+                    frappe.db.get_value("Item", item.item_code, "item_group") == extended_group
+                    for item in so.items
+                )
+                delivery_after = wc_server.delivery_after_days or 7
+                if has_extended:
+                    delivery_after *= 2
+                delivery_date = frappe.utils.add_days(quot.transaction_date, delivery_after)
+                so.delivery_date = delivery_date
+                for item in so.items:
+                    item.delivery_date = delivery_date
+
+                # Restore Quotation's payment terms immediately after
+                if original_quot_terms:
+                    frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
+                    frappe.db.commit()
                 
                 # Temporarily clear payment terms on new SO (mirroring existing logic)
                 original_so_terms = so.payment_terms_template
@@ -541,13 +562,16 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 original_cust_terms = frappe.db.get_value("Customer", so.customer, "payment_terms")
                 try:
                     frappe.db.set_value("Customer", so.customer, "payment_terms", None)
+                    frappe.clear_cache(doctype="Customer")
                     so.flags.ignore_mandatory = True
                     so.submit()
                 finally:
                     # Restore original terms
                     frappe.db.set_value("Customer", so.customer, "payment_terms", original_cust_terms)
+                    frappe.clear_cache(doctype="Customer")
                     if original_quot_terms:
                         frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
+                        frappe.clear_cache(doctype="Quotation")  # Optional, for consistency
                     if original_so_terms:
                         frappe.db.set_value("Sales Order", so.name, "payment_terms_template", original_so_terms)
                     frappe.db.commit()
@@ -579,9 +603,11 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 original_terms = frappe.db.get_value("Customer", doc.customer, "payment_terms")
                 try:
                     frappe.db.set_value("Customer", doc.customer, "payment_terms", None)
+                    frappe.clear_cache(doctype="Customer")
                     doc.submit()
                 finally:
                     frappe.db.set_value("Customer", doc.customer, "payment_terms", original_terms)
+                    frappe.clear_cache(doctype="Customer")
                     frappe.db.commit()  # Ensure the restore is committed immediately
 
                 doc.load_from_db()  # Reload to ensure updated state (e.g., docstatus=1, any triggered updates)
