@@ -539,7 +539,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 delivery_after = wc_server.delivery_after_days or 7
                 if has_extended:
                     delivery_after *= 2
-                delivery_date = frappe.utils.add_days(quot.transaction_date, delivery_after)
+                delivery_date = frappe.utils.add_days(frappe.utils.nowdate(), delivery_after)
                 so.delivery_date = delivery_date
                 for item in so.items:
                     item.delivery_date = delivery_date
