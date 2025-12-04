@@ -1874,11 +1874,20 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         country_code = raw_data.get("country", "US")
         phone = raw_data.get("phone")
         address.phone = clean_phone_number(phone, country_code)
-        address.address_title = (
-            customer.customer_name
-            if title_convention == "Customer Name only"
-            else f"{customer.name}-{address.address_type}"
-        )
+        
+        # Compute per-address title based on raw_data
+        cleaned_company = clean_company_name(raw_data.get("company", "").strip())
+        proper_company = to_proper_case(cleaned_company) if cleaned_company else ""
+        individual_name = f"{to_proper_case(raw_data.get('first_name', ''))} {to_proper_case(raw_data.get('last_name', ''))}".strip()
+        if not individual_name:
+            individual_name = raw_data.get("email", "") or "Unknown"  # Fallback if no name/company (rare for shipping)
+        address_title_base = proper_company if cleaned_company else individual_name
+
+        if title_convention == "Customer Name only":
+            address.address_title = address_title_base
+        else:
+            address.address_title = f"{address_title_base}-{address.address_type}"
+        
         address.is_primary_address = is_primary_address
         address.is_shipping_address = is_shipping_address
         address.append("links", {"link_doctype": "Customer", "link_name": customer.name})
@@ -1907,11 +1916,20 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         country_code = raw_data.get("country", "US")
         phone = raw_data.get("phone")
         address.phone = clean_phone_number(phone, country_code)
-        address.address_title = (
-            customer.customer_name
-            if title_convention == "Customer Name only"
-            else f"{customer.name}-{address.address_type}"
-        )
+        
+        # Compute per-address title based on raw_data
+        cleaned_company = clean_company_name(raw_data.get("company", "").strip())
+        proper_company = to_proper_case(cleaned_company) if cleaned_company else ""
+        individual_name = f"{to_proper_case(raw_data.get('first_name', ''))} {to_proper_case(raw_data.get('last_name', ''))}".strip()
+        if not individual_name:
+            individual_name = raw_data.get("email", "") or "Unknown"  # Fallback if no name/company (rare for shipping)
+        address_title_base = proper_company if cleaned_company else individual_name
+
+        if title_convention == "Customer Name only":
+            address.address_title = address_title_base
+        else:
+            address.address_title = f"{address_title_base}-{address.address_type}"
+        
         address.is_primary_address = is_primary_address
         address.is_shipping_address = is_shipping_address
 
