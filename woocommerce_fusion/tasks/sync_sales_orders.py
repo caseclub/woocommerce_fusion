@@ -1728,6 +1728,55 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         new_sales_order.calculate_taxes_and_totals()  # Explicitly calculate totals
         calculated_grand_total = new_sales_order.get("grand_total")
         wc_grand_total = float(wc_order.total)
+        
+        # --- PATCH: fix mis-stored totals on split child WooCommerce orders ---
+        # Some split "child" orders (e.g. 150289) have the parent-level "Custom Raw Foam Fee"
+        # included in wc_order.total even though the fee is not present in this child's
+        # own line_items / fee_lines. This causes a Grand Total mismatch when creating
+        # the ERPNext Sales Order. To compensate, we recompute the Woo total from the
+        # child's own lines and, if that matches ERPNext's grand_total, use it instead.
+
+        try:
+            meta_list = json.loads(wc_order.meta_data) if wc_order.meta_data else []
+        except (TypeError, json.JSONDecodeError):
+            meta_list = []
+
+        order_type = None
+        if isinstance(meta_list, list):
+            for m in meta_list:
+                if isinstance(m, dict) and m.get("key") == "order_type":
+                    order_type = m.get("value")
+                    break
+
+        if order_type == "child":
+            try:
+                line_items = json.loads(wc_order.line_items) if wc_order.line_items else []
+                shipping_lines = json.loads(wc_order.shipping_lines) if wc_order.shipping_lines else []
+                fee_lines = json.loads(wc_order.fee_lines) if wc_order.fee_lines else []
+            except (TypeError, json.JSONDecodeError):
+                line_items, shipping_lines, fee_lines = [], [], []
+
+            recomputed_total = 0.0
+
+            # Sum this child's own lines
+            for li in line_items:
+                recomputed_total += float(li.get("total") or 0) + float(li.get("total_tax") or 0)
+
+            for sl in shipping_lines:
+                recomputed_total += float(sl.get("total") or 0) + float(sl.get("total_tax") or 0)
+
+            # Only fees actually attached to THIS child (usually none in the bad case)
+            for fl in fee_lines:
+                recomputed_total += float(fl.get("total") or 0) + float(fl.get("total_tax") or 0)
+
+            # If the recomputed child total matches ERPNext but differs from the Woo stored total,
+            # assume a parent-level fee leaked into wc_order.total and override it.
+            if (
+                abs(recomputed_total - calculated_grand_total) <= 0.01
+                and abs(recomputed_total - wc_grand_total) > 0.01
+            ):
+                wc_grand_total = recomputed_total
+        
         diff = wc_grand_total - calculated_grand_total
 
         if abs(diff) > 0.005 and abs(diff) <= 1:
