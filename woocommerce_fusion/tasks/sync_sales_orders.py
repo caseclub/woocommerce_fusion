@@ -982,8 +982,52 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             and not sales_order.woocommerce_payment_entry
             and sales_order.docstatus == 1
         ):
+            
+            # --- PATCH: fix mis-stored totals on split child WooCommerce orders ---
+            try:
+                meta_list = json.loads(wc_order.meta_data) if wc_order.meta_data else []
+            except (TypeError, json.JSONDecodeError):
+                meta_list = []
+
+            order_type = None
+            if isinstance(meta_list, list):
+                for m in meta_list:
+                    if isinstance(m, dict) and m.get("key") == "order_type":
+                        order_type = m.get("value")
+                        break
+
+            if order_type == "child":
+                try:
+                    line_items = json.loads(wc_order.line_items) if wc_order.line_items else []
+                    shipping_lines = json.loads(wc_order.shipping_lines) if wc_order.shipping_lines else []
+                    fee_lines = json.loads(wc_order.fee_lines) if wc_order.fee_lines else []
+                except (TypeError, json.JSONDecodeError):
+                    line_items, shipping_lines, fee_lines = [], [], []
+
+                recomputed_total = 0.0
+
+                # Sum this child's own lines (including taxes)
+                for li in line_items:
+                    recomputed_total += float(li.get("total") or 0) + float(li.get("total_tax") or 0)
+
+                for sl in shipping_lines:
+                    recomputed_total += float(sl.get("total") or 0) + float(sl.get("total_tax") or 0)
+
+                for fl in fee_lines:
+                    recomputed_total += float(fl.get("total") or 0) + float(fl.get("total_tax") or 0)
+
+                # Override wc_order.total for payment purposes if recomputed differs (indicating leaked parent fee)
+                original_wc_total = float(wc_order.total)
+                if abs(recomputed_total - original_wc_total) > 0.01:
+                    wc_order_total_for_payment = recomputed_total  # Use recomputed for PE
+                else:
+                    wc_order_total_for_payment = original_wc_total
+            else:
+                wc_order_total_for_payment = float(wc_order.total)
+            # --- END PATCH ---
+            
             # If the grand total is 0, skip payment entry creation
-            if sales_order.grand_total is None or float(sales_order.grand_total) == 0:
+            if sales_order.grand_total is None or wc_order_total_for_payment == 0:
                 attempted_flag = 1
                 return True, None, attempted_flag
 
@@ -1003,7 +1047,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 company_gl_account = PAYMENT_METHOD_GL_ACCOUNT_MAPPING[wc_order.payment_method]
 
                 # Create a new Payment Entry
-                company = frappe.get_value("Account", company_gl_account, "company")
+                company = frappe.get_value("Account", company_gl_account, "company")                
                 meta_data = wc_order.get("meta_data", None)
 
                 # Attempt to get Payfast Transaction ID
@@ -1059,8 +1103,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                     "party_type": "Customer",
                     "party": sales_order.customer,
                     "posting_date": wc_order.date_paid or sales_order.transaction_date,
-                    "paid_amount": float(wc_order.total),
-                    "received_amount": float(wc_order.total),
+                    "paid_amount": wc_order_total_for_payment,
+                    "received_amount": wc_order_total_for_payment,
                     "bank_account": company_bank_account,
                     "paid_to": company_gl_account,
                 }
@@ -1077,7 +1121,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 row.reference_name = reference_name
                 row.total_amount = total_amount
                 row.outstanding_amount = outstanding  # Set explicitly for clarity
-                row.allocated_amount = min(total_amount, outstanding)  # Prevent over-allocation
+                row.allocated_amount = min(wc_order_total_for_payment, outstanding)  # Use recomputed to prevent over-allocation on children
                 payment_entry.save()
                 
                 # Auto-submit the Payment Entry to record the advance in the clearing account
