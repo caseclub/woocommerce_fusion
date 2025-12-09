@@ -190,7 +190,7 @@ def safe_get_wc_orders(date_time_from=None, status=None):
         return get_list_of_wc_orders(date_time_from=date_time_from, status=status)
     except Exception as e:
         if "DNS" in str(e) or "NameResolutionError" in str(e) or "Temporary failure in name resolution" in str(e):
-            frappe.log_error(f"Skipped WC fetch for status={status}: {str(e)}", "WooCommerce DNS Skip")
+            frappe.log_error(message=f"Skipped WC fetch for status={status}: {str(e)}", title="WC DNS Skip")
             return []
         raise
     
@@ -220,7 +220,7 @@ def sync_woocommerce_orders_modified_since(date_time_from=None):
     
     lock_key = "wc_order_sync_lock"
     if frappe.cache().get_value(lock_key):
-        frappe.log_error("WooCommerce Order Sync Skipped", "Batch sync already in progress (lock held).")
+        frappe.log_error(message="Batch sync already in progress (lock held).", title="WC Order Sync Skipped")
         return  # Skip if another sync is running
     
     try:
@@ -431,7 +431,7 @@ def sync_erpnext_to_woocommerce_orders():
 
             frappe.db.commit()
         except Exception as e:
-            frappe.log_error(f"Failed to sync WC Order {wc_order.id} from ERPNext", frappe.get_traceback())
+            frappe.log_error(message=frappe.get_traceback(), title=f"WC Order Sync Fail: {wc_order.id}")
             pass  # Continue to next order
         
 def get_provider(parcel_service):
@@ -517,7 +517,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                         quot.load_from_db()  # Reload after submission
                     except Exception as e:
                         error_msg = f"Failed to auto-submit draft Quotation {reference_no} for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
-                        frappe.log_error(f"WooCommerce Auto-Submit Quotation Error", error_msg)
+                        frappe.log_error(message=error_msg, title="WC Auto-Submit Quotation Error")
                         return False
                 
                 # Temporarily clear payment terms on Quotation to avoid inheritance issues
@@ -585,7 +585,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 
             except Exception as e:
                 error_msg = f"Failed to create/submit SO from Quotation {reference_no} for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
-                frappe.log_error(f"WooCommerce Quotation to SO Error", error_msg)
+                frappe.log_error(message=error_msg, title="WC Quotation to SO Error")
                 return False  # Bail out if creation fails        
         
         # Auto-submit draft Sales Order or Sales Invoice before applying payment
@@ -614,7 +614,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 frappe.db.commit()  # Ensure changes are committed
             except Exception as e:
                 error_msg = f"Failed to auto-submit draft {doctype} {reference_no} for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
-                frappe.log_error(f"WooCommerce Auto-Submit {doctype} Error", error_msg)
+                frappe.log_error(message=error_msg, title=f"WC Auto-Submit {doctype} Error")
                 return False  # Bail out if submission fails to avoid invalid PE insert 
  
         outstanding = doc.outstanding_amount if doctype == "Sales Invoice" else (doc.rounded_total - doc.advance_paid)
@@ -682,7 +682,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         return True
     except Exception as e:
         error_msg = f"Failed to process portal payment for WC Order {wc_order.id}: {str(e)}\n{frappe.get_traceback()}"
-        frappe.log_error("WooCommerce Portal Payment Error", error_msg)
+        frappe.log_error(message=error_msg, title="WC Portal Payment Error")
         return False
 
 """
@@ -766,14 +766,13 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             self.get_corresponding_sales_order_or_woocommerce_order()
             self.sync_wc_order_with_erpnext_order()
         except WooCommerceMissingItemError as err:
-            title = f'{err.product_name} Not Found - [{err.woocomm_item_id}]'
             simple_msg = f"Could not sync WooCommerce Order {err.order_id} from {err.woocommerce_server} because no matching item was found in ERPNext for product ID {err.woocomm_item_id} ({err.product_name}). To resolve the issue, map the item in erpNext."
-            frappe.log_error(title, simple_msg)
+            frappe.log_error(message=simple_msg, title="WC Item Not Found")
             self.sales_order = None
             return  # don't re-raise      
         except Exception as err:
             error_message = f"{frappe.get_traceback()}\n\nSales Order Data: \n{str(self.sales_order.as_dict()) if self.sales_order else ''}\n\nWC Product Data \n{str(self.woocommerce_order.as_dict()) if self.woocommerce_order else ''})"
-            frappe.log_error("WooCommerce Error", error_message)
+            frappe.log_error(message=error_message, title="WC Error")
             raise err
 
     def get_third_party_shipping_details(self, wc_order: WooCommerceOrder) -> Optional[Dict]:
@@ -816,7 +815,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                     }
         except Exception as e:
             # Optional: Log the error for debugging
-            frappe.log_error(f"Error parsing shipping description for WC Order {wc_order.id}: {str(e)}")
+            frappe.log_error(message=f"Error parsing shipping description for WC Order {wc_order.id}: {str(e)}", title="WC Shipping Parse Error")
         
         return None
 
@@ -1345,7 +1344,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 new_sales_order.reload()
         except Exception as e:
             error_msg = f"Failed to create/submit SO for WC Order {wc_order.id}: {str(e)}\nItem details may require supplier when drop ship is enabled."
-            frappe.log_error("WooCommerce SO Creation Error", error_msg)
+            frappe.log_error(message=error_msg, title="WC SO Creation Error")
             raise  # Re-raise to maintain existing behavior
 
         # Create PE if conditions met; use db_set for links/flags (no .save() on submitted SO)
@@ -1380,10 +1379,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
         if not email and not is_guest:
             # Log raw_billing_data
-            frappe.log_error(
-                "WooCommerce Error",
-                f"Email is required to create or link a customer. \n\nCustomer Data: {raw_billing_data}",
-            )
+            frappe.log_error(message=f"Email is required to create or link a customer. \n\nCustomer Data: {raw_billing_data}", title="WC Customer Error")
             return None
 
         wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
@@ -1495,12 +1491,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         existing_company = potential_cust["company"].lower()
         expected_company = company_name.lower()
         if existing_company != expected_company:
-            frappe.log_error(
-                f"Email Match, but Company mismatch for potential customer {potential_cust['name']}: Expected '{company_name}', Found '{potential_cust['company']}'",
-                "WooCommerce Customer Merge Skip - Company Mismatch"
-            )
-            return False
-        
+            frappe.log_error(message=f"Email Match, but Company mismatch for potential customer {potential_cust['name']}: Expected '{company_name}', Found '{potential_cust['company']}'", title="WC Merge Skip - Company Mismatch")
         # Improved Name match: Compare against primary contact's name if available
         # Fetch primary contact for the potential customer
         primary_contact = frappe.db.get_value("Customer", potential_cust['name'], "customer_primary_contact")
@@ -1515,18 +1506,12 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         # If no existing contact name, skip name check (or log and proceed/ fail based on policy)
         # Here, we'll skip (assume match if company matches and no contact to compare)
         if not existing_full_name:
-            frappe.log_error(
-                f"No primary contact found for potential customer {potential_cust['name']}. Skipping name check. Expected name: '{individual_name}'",
-                "WooCommerce Customer Merge Skip - No Contact for Name Check"
-            )
+            frappe.log_error(message=f"No primary contact found for potential customer {potential_cust['name']}. Skipping name check. Expected name: '{individual_name}'", title="WC Merge Skip - No Contact")
             # Proceed as if name matches, since company already matches
         else:
             # Loose substring match on contact name
             if expected_name_lower not in existing_full_name and existing_full_name not in expected_name_lower:
-                frappe.log_error(
-                    f"Name mismatch for potential customer {potential_cust['name']}: Expected '{individual_name}', Found '{existing_full_name.title()}' (from primary contact)",
-                    "WooCommerce Customer Merge Skip - Name Mismatch"
-                )
+                frappe.log_error(message=f"Name mismatch for potential customer {potential_cust['name']}: Expected '{individual_name}', Found '{existing_full_name.title()}' (from primary contact)", title="WC Merge Skip - Name Mismatch")
                 return False
         
         # Address summary match with detailed diff logging
@@ -1548,10 +1533,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             limit=1
         )
         if not existing_addresses:
-            frappe.log_error(
-                f"No primary billing address found for potential customer {potential_cust['name']}. Expected summary: {expected_summary}",
-                "WooCommerce Customer Merge Skip - Missing Address"
-            )
+            frappe.log_error(message=f"No primary billing address found for potential customer {potential_cust['name']}. Expected summary: {expected_summary}", title="WC Merge Skip - Missing Address")
             return False
         
         existing = existing_addresses[0]
@@ -1572,7 +1554,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                               f"Expected summary: {expected_summary}\n" \
                               f"Found summary: {found_summary}\n" \
                               f"Specific mismatches:\n" + "\n".join(mismatches)
-                frappe.log_error(log_message, "WooCommerce Customer Merge Skip - Address Mismatch")
+                frappe.log_error(message=log_message, title="WC Merge Skip - Address Mismatch")
             return False
         
         return True
@@ -2076,7 +2058,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                     sales_order.db_set("status", "Completed")
                 return True
             except Exception as e:
-                frappe.log_error(f"Failed to submit existing draft SI {si.name} for SO {sales_order.name}: {str(e)}")
+                frappe.log_error(message=f"Failed to submit existing draft SI {si.name} for SO {sales_order.name}: {str(e)}", title="WC SI Submit Error")
                 return False
         else:
             # No draft found; create new SI (original logic)
@@ -2098,7 +2080,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                     sales_order.db_set("status", "Completed")
                 return True
             except Exception as e:
-                frappe.log_error(f"Failed to create/submit SI for SO {sales_order.name}: {str(e)}")
+                frappe.log_error(message=f"Failed to create/submit SI for SO {sales_order.name}: {str(e)}", title="WC SI Creation Error")
                 return False     
 
 
