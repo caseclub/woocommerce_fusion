@@ -767,7 +767,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             self.sync_wc_order_with_erpnext_order()
         except WooCommerceMissingItemError as err:
             simple_msg = f"Could not sync WooCommerce Order {err.order_id} from {err.woocommerce_server} because no matching item was found in ERPNext for product ID {err.woocomm_item_id} ({err.product_name}). To resolve the issue, map the item in erpNext."
-            frappe.log_error(message=simple_msg, title="WC Item Not Found")
+            frappe.log_error(message=simple_msg, title="WooCommerce Item Not Found: {err.woocomm_item_id}")
             self.sales_order = None
             return  # don't re-raise      
         except Exception as err:
