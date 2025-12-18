@@ -663,6 +663,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         pe.paid_amount = payment_amount
         pe.received_amount = payment_amount
         pe.paid_to = wc_server.custom_credit_card_clearing_account
+        pe.bank_account = wc_server.custom_credit_card_clearing_account
         pe.paid_to_account_currency = currency
         pe.reference_no = f"WC Portal {wc_order.id} - Trans ID: {trans_id}"
         pe.reference_date = wc_order.date_paid or now().split(" ")[0]
