@@ -1493,7 +1493,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         existing_company = potential_cust["company"].lower()
         expected_company = company_name.lower()
         if existing_company != expected_company:
-            frappe.log_error(message=f"Email Match, but Company mismatch for potential customer {potential_cust['name']}: Expected '{company_name}', Found '{potential_cust['company']}'", title="WC Merge Skip - Company Mismatch")
+            #frappe.log_error(message=f"Email Match, but Company mismatch for potential customer {potential_cust['name']}: Expected '{company_name}', Found '{potential_cust['company']}'", title="WC Merge Skip - Company Mismatch")
+            pass
         # Improved Name match: Compare against primary contact's name if available
         # Fetch primary contact for the potential customer
         primary_contact = frappe.db.get_value("Customer", potential_cust['name'], "customer_primary_contact")
@@ -1556,7 +1557,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                               f"Expected summary: {expected_summary}\n" \
                               f"Found summary: {found_summary}\n" \
                               f"Specific mismatches:\n" + "\n".join(mismatches)
-                frappe.log_error(message=log_message, title="WC Merge Skip - Address Mismatch")
+                #frappe.log_error(message=log_message, title="WC Merge Skip - Address Mismatch")
             return False
         
         return True
