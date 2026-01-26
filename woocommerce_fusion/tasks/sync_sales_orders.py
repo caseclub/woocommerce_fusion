@@ -423,11 +423,19 @@ def sync_erpnext_to_woocommerce_orders():
                 wc_order.save()
                 # Update SO hash to prevent loops
                 sales_order.custom_woocommerce_last_sync_hash = wc_order.woocommerce_date_modified
-                sales_order.save(ignore_permissions=True)
+                if sales_order.docstatus == 1:
+                    frappe.db.set_value("Sales Order", sales_order.name, "custom_woocommerce_last_sync_hash", wc_order.woocommerce_date_modified)
+                else:
+                    sales_order.save(ignore_permissions=True)
+                sales_order.reload()  # Refresh in-memory object
             elif wc_order_dirty:
                 # If direct API was done, update SO hash here
                 sales_order.custom_woocommerce_last_sync_hash = wc_order.woocommerce_date_modified
-                sales_order.save(ignore_permissions=True)
+                if sales_order.docstatus == 1:
+                    frappe.db.set_value("Sales Order", sales_order.name, "custom_woocommerce_last_sync_hash", wc_order.woocommerce_date_modified)
+                else:
+                    sales_order.save(ignore_permissions=True)
+                sales_order.reload()  # Refresh in-memory object
 
             frappe.db.commit()
         except Exception as e:
@@ -927,6 +935,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
 
             if sales_order.custom_woocommerce_customer_note != woocommerce_order.customer_note:
                 sales_order.custom_woocommerce_customer_note = woocommerce_order.customer_note
+                so_dirty = True  # Added dirty flag for customer_note
 
             # Update the payment_method_title field if necessary, use the payment method ID
             # if the title field is too long
@@ -940,24 +949,56 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 so_dirty = True
 
             if not sales_order.woocommerce_payment_entry:
-                if self.create_and_link_payment_entry(woocommerce_order, sales_order):
-                    sales_order.reload()  # Reload after PE to sync timestamps                    
-                    so_dirty = True
+                pe_created, pe_name, attempted_flag = self.create_and_link_payment_entry(woocommerce_order, sales_order)
+                if pe_created:
+                    # Set woocommerce_payment_entry safely
+                    if sales_order.docstatus == 1:
+                        frappe.db.set_value("Sales Order", sales_order.name, "woocommerce_payment_entry", pe_name)
+                    else:
+                        sales_order.woocommerce_payment_entry = pe_name
+                        so_dirty = True  # Mark dirty if not submitted
+                    sales_order.reload()  # Reload after update
+                    so_dirty = True  # Ensure dirty for any further saves
+                if attempted_flag is not None:
+                    # Set attempted flag safely (consistent with create_sales_order)
+                    if sales_order.docstatus == 1:
+                        frappe.db.set_value("Sales Order", sales_order.name, "custom_attempted_woocommerce_auto_payment_entry", attempted_flag)
+                    else:
+                        sales_order.custom_attempted_woocommerce_auto_payment_entry = attempted_flag
+                        so_dirty = True
+                    sales_order.reload()
 
             if so_dirty:
                 sales_order.flags.created_by_sync = True
-                sales_order.save()
+                if sales_order.docstatus == 1:
+                    # For submitted, use db_set for all changed fields (batch them for efficiency)
+                    updates = {
+                        "woocommerce_status": sales_order.woocommerce_status,
+                        "woocommerce_payment_method": sales_order.woocommerce_payment_method,
+                        "custom_woocommerce_customer_note": sales_order.custom_woocommerce_customer_note,
+                        # Add any other fields that might have changed
+                    }
+                    frappe.db.set_value("Sales Order", sales_order.name, updates)
+                else:
+                    sales_order.save()
                 sales_order.reload()  # Ensure latest state
-                # Update hash to reflect successful sync
+
+            # Update hash to reflect successful sync
+            if sales_order.docstatus == 1:
+                frappe.db.set_value("Sales Order", sales_order.name, "custom_woocommerce_last_sync_hash", woocommerce_order.woocommerce_date_modified)
+            else:
                 sales_order.custom_woocommerce_last_sync_hash = woocommerce_order.woocommerce_date_modified
                 sales_order.flags.created_by_sync = True
                 sales_order.save()
-                
+            sales_order.reload()
+
             # If WC status is "completed" and SO not fully billed, create SI
             if woocommerce_order.status == "completed" and sales_order.per_billed < 100:
                 self.create_and_submit_sales_invoice(sales_order)
                 # Reload after SI to ensure fresh state (if further ops)
                 sales_order.reload()
+
+        frappe.db.commit()
 
     def create_and_link_payment_entry(
         self, wc_order: WooCommerceOrder, sales_order: SalesOrder
@@ -1350,9 +1391,12 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             safe_insert(new_sales_order)
             new_sales_order.reload()
 
-            # Set hash before submit
+            # Set hash before submit (still draft, so .save() is fine, but make conditional for safety)
             new_sales_order.custom_woocommerce_last_sync_hash = wc_order.woocommerce_date_modified
-            new_sales_order.save()
+            if new_sales_order.docstatus == 1:  # Unlikely here, but safe
+                frappe.db.set_value("Sales Order", new_sales_order.name, "custom_woocommerce_last_sync_hash", wc_order.woocommerce_date_modified)
+            else:
+                new_sales_order.save()
             new_sales_order.reload()
 
             if wc_server.submit_sales_orders:
@@ -1373,6 +1417,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         # If WC order is already "completed" (shipped/FBA fulfilled), create SI
         if wc_order.status == "completed":
             self.create_and_submit_sales_invoice(new_sales_order)
+            
+        frappe.db.commit()
 
     def create_or_link_customer_and_address(self, wc_order: WooCommerceOrder) -> str:
         """
