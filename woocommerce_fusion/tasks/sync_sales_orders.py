@@ -621,11 +621,25 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         if outstanding <= 0:
             return True  # Already fully paid; treat as success
         
-        # Extract trans_id from meta_data
+        # Extract trans_id from meta_data.
+        # Preferred source: Elavon Converge meta key.
+        # Fallback: WooCommerce order "transaction_id" field.
         meta_data = json.loads(wc_order.meta_data) if wc_order.meta_data else []
-        trans_id = next((m['value'] for m in meta_data if m['key'] == '_wc_elavon_converge_credit_card_trans_id'), None)
+        trans_id = next(
+            (m.get("value") for m in meta_data if m.get("key") == "_wc_elavon_converge_credit_card_trans_id"),
+            None,
+        )
+
         if not trans_id:
-            raise ValueError(f"No _wc_elavon_converge_credit_card_trans_id found in WC Order {wc_order.id}")
+            # WC API commonly exposes this as "transaction_id" (string). Some plugins store it as empty.
+            trans_id = getattr(wc_order, "transaction_id", None)
+
+        # Final validation
+        if not trans_id:
+            raise ValueError(
+                f"No payment transaction id found for WC Order {wc_order.id} "
+                f"(missing _wc_elavon_converge_credit_card_trans_id and transaction_id)"
+            )
         
         # Check existing payments for duplicate (via reference_no containing trans_id)
         payments = frappe.get_all(
