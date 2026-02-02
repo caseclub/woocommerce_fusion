@@ -1868,8 +1868,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         
         diff = wc_grand_total - calculated_grand_total
 
+        wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
         if abs(diff) > 0.005 and abs(diff) <= 1:
-            wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
             # Append rounding adjustment as a tax row (add 'rounding_account' field to WooCommerce Server doctype)
             new_sales_order.append(
                 "taxes",
@@ -1883,6 +1883,32 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             new_sales_order.calculate_taxes_and_totals()  # Recalculate with adjustment
         elif abs(diff) > 1:
             frappe.throw(_("Grand Total mismatch between WooCommerce ({0}) and ERPNext ({1}) by {2}").format(wc_grand_total, calculated_grand_total, diff))
+            
+        # Set tax_category based on actual SALES TAX only:
+        # Only consider rows posted to wc_server.tax_account (avoid handling/shipping charges in taxes table).
+        taxable_cat = getattr(wc_server, "custom_tax_category_taxable", None)
+        no_tax_cat = getattr(wc_server, "custom_tax_category_no_tax", None)
+        tax_account = getattr(wc_server, "tax_account", None)
+
+        sales_tax_total = 0.0
+        if tax_account:
+            for t in (new_sales_order.get("taxes") or []):
+                # child rows may be dict-like or DocType objects depending on context
+                acc = t.get("account_head") if hasattr(t, "get") else getattr(t, "account_head", None)
+                amt = t.get("tax_amount") if hasattr(t, "get") else getattr(t, "tax_amount", 0)
+                if acc == tax_account:
+                    try:
+                        sales_tax_total += float(amt or 0)
+                    except (TypeError, ValueError):
+                        pass
+
+        if sales_tax_total > 0:
+            if taxable_cat:
+                new_sales_order.tax_category = taxable_cat
+        else:
+            if no_tax_cat:
+                new_sales_order.tax_category = no_tax_cat
+
 
     def set_sales_order_item_fields(
         self, woocommerce_order_line_item: Dict, so_item: Union[SalesOrderItem, Dict]
