@@ -2250,6 +2250,39 @@ def create_contact(data, customer):
         if (email and has_email) or (normalized_phone and has_phone):
             matching_contact = contact
             break
+        
+    def _ensure_single_primary_phone(contact_doc):
+        """
+        Frappe Contact.validate() enforces only one primary phone.
+        If data drift already created multiple primaries, clean it up before save.
+        """
+        if not getattr(contact_doc, "phone_nos", None):
+            return False
+
+        changed = False
+
+        # Keep the first primary phone, clear the rest
+        primary_seen = False
+        for row in contact_doc.phone_nos:
+            if getattr(row, "is_primary_phone", 0):
+                if not primary_seen:
+                    primary_seen = True
+                else:
+                    row.is_primary_phone = 0
+                    changed = True
+
+        # Same idea for primary mobile (optional, but prevents similar drift)
+        mobile_seen = False
+        for row in contact_doc.phone_nos:
+            if getattr(row, "is_primary_mobile_no", 0):
+                if not mobile_seen:
+                    mobile_seen = True
+                else:
+                    row.is_primary_mobile_no = 0
+                    changed = True
+
+        return changed
+
 
     if matching_contact:
         # Update existing contact if necessary
@@ -2266,9 +2299,21 @@ def create_contact(data, customer):
         if email and not any(e.email_id == email for e in matching_contact.email_ids):
             matching_contact.add_email(email, is_primary=1)
             dirty = True
-        if cleaned_phone and not any(normalize_phone(p.phone) == normalized_phone for p in matching_contact.phone_nos):
-            matching_contact.add_phone(cleaned_phone, is_primary_mobile_no=1, is_primary_phone=1)
+
+        # Normalize any existing "multiple primary" drift before we append anything new
+        if _ensure_single_primary_phone(matching_contact):
             dirty = True
+
+        if cleaned_phone and not any(normalize_phone(p.phone) == normalized_phone for p in matching_contact.phone_nos):
+            has_primary_phone = any(getattr(p, "is_primary_phone", 0) for p in matching_contact.phone_nos)
+            has_primary_mobile = any(getattr(p, "is_primary_mobile_no", 0) for p in matching_contact.phone_nos)
+            matching_contact.add_phone(
+                cleaned_phone,
+                is_primary_mobile_no=0 if has_primary_mobile else 1,
+                is_primary_phone=0 if has_primary_phone else 1,
+            )
+            dirty = True
+
         if dirty:
             matching_contact.flags.ignore_mandatory = True
             matching_contact.save()
