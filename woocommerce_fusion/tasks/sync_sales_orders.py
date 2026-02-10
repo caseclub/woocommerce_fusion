@@ -487,7 +487,10 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         if not frappe.db.exists(doctype, reference_no):
             return True  # Ignore if not found, treat as success
         doc = frappe.get_doc(doctype, reference_no)
-        
+
+        if doc.docstatus == 2:  # Cancelled; ignore and treat as success
+            return True
+
         # Handle Quotation by creating and submitting a Sales Order from it
         if doctype == "Quotation":
             try:
@@ -598,6 +601,9 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         
         # Auto-submit draft Sales Order or Sales Invoice before applying payment
         if doctype in ["Sales Order", "Sales Invoice"] and doc.docstatus == 0: # Quotation handled separately above
+            # Redundant check (already loaded as draft), but for clarity/consistency
+            if doc.docstatus != 0:  # Should not happen, but skip if not draft
+                return True
             try:
                 doc.flags.ignore_mandatory = True  # Bypass any non-critical validations if needed
                 # Clear payment_terms_template and payment_schedule on draft SO/SI to avoid due date conflicts during submit/SI creation
