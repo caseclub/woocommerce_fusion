@@ -12,7 +12,7 @@ from erpnext.selling.doctype.sales_order_item.sales_order_item import SalesOrder
 from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 from erpnext.accounts.utils import get_balance_on
 from frappe import _
-from frappe.utils import get_datetime, now, add_days
+from frappe.utils import get_datetime, now, add_days, flt
 from frappe.utils.data import cstr, now
 from jsonpath_ng.ext import parse
 from woocommerce import API
@@ -675,6 +675,27 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         payment_amount = float(fee_lines[0].get("total", wc_order.total or 0))
         if payment_amount <= 0 or payment_amount > outstanding:
             raise ValueError(f"Invalid payment amount {payment_amount} for WC Order {wc_order.id} (outstanding: {outstanding})")
+        
+        payment_amount = flt(fee_lines[0].get("total", wc_order.total or 0))
+        outstanding = flt(outstanding)
+
+        # If the payment amount doesn't match the ERPNext doc amount, do nothing further.
+        # (Avoids throwing and keeps the batch sync moving.)
+        tolerance = 0.01
+        if payment_amount <= 0:
+            return True
+        if abs(payment_amount - outstanding) > tolerance:
+            frappe.log_error(
+                message=(
+                    f"WC portal payment amount mismatch; skipping PE creation.\n"
+                    f"WC Order: {wc_order.id}\n"
+                    f"Reference: {doctype} {reference_no}\n"
+                    f"Payment amount: {payment_amount}\n"
+                    f"Outstanding: {outstanding}"
+                ),
+                title="WC Portal Payment Amount Mismatch",
+            )
+            return True
         
         wc_server = frappe.get_cached_doc("WooCommerce Server", wc_order.woocommerce_server)
        
