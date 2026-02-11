@@ -6,7 +6,8 @@ import random
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from urllib.parse import urlparse
 from urllib3.exceptions import NameResolutionError, NewConnectionError
-
+import requests
+from requests.exceptions import ReadTimeout as RequestsReadTimeout
 import json
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
@@ -613,6 +614,31 @@ def log_and_raise_error(exception=None, error_text=None, response=None):
     """
     Create an "Error Log" and raise error
     """
+    # Pick a more descriptive title based on the root failure mode
+    def _error_title(exc, resp) -> str:
+        # Timeout family
+        if isinstance(exc, (RequestsReadTimeout, requests.exceptions.Timeout, socket.timeout, TimeoutError)):
+            return "WooCommerce Timeout"
+
+        # DNS / connection family
+        if isinstance(exc, (RequestsConnectionError, NameResolutionError, NewConnectionError, socket.gaierror)):
+            return "WooCommerce Connection Error"
+
+        # Non-200 responses
+        if resp is not None:
+            try:
+                code = int(resp.status_code)
+                if code == 401 or code == 403:
+                    return "WooCommerce Auth Error"
+                if 400 <= code < 500:
+                    return "WooCommerce Client Error"
+                if 500 <= code < 600:
+                    return "WooCommerce Server Error"
+            except Exception:
+                pass
+
+        return "WooCommerce Error"
+
     error_message = frappe.get_traceback() if exception else ""
     error_message += f"\n{error_text}" if error_text else ""
     error_message += (
@@ -620,13 +646,14 @@ def log_and_raise_error(exception=None, error_text=None, response=None):
         if response is not None
         else ""
     )
-    log = frappe.log_error("WooCommerce Error", error_message)
+    title = _error_title(exception, response)
+    log = frappe.log_error(title, error_message)
     log_link = frappe.utils.get_link_to_form("Error Log", log.name)
     frappe.throw(
         msg=_("Something went wrong while connecting to WooCommerce. See Error Log {0}").format(
             log_link
         ),
-        title=_("WooCommerce Error"),
+        title=_(title),
     )
     if exception:
         raise exception
