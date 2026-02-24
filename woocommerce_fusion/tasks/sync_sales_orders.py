@@ -1694,6 +1694,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                     woocomm_item_id = "125127-PE"
                 elif "polyurethane" in desc:
                     woocomm_item_id = "125127-PU"
+                elif "anti-stat" in desc:
+                    woocomm_item_id = "125127-AS"
                 # If neither keyword is found, woocomm_item_id remains unchanged
 
             # Deleted items will have a "0" for variation_id/product_id
