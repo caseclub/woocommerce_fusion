@@ -670,18 +670,30 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                 break
         if is_duplicate:
             return True  # Already applied; treat as success
-        
-        # Create and submit Payment Entry (use fee total for amount)
-        payment_amount = float(fee_lines[0].get("total", wc_order.total or 0))
-        if payment_amount <= 0 or payment_amount > outstanding:
-            raise ValueError(f"Invalid payment amount {payment_amount} for WC Order {wc_order.id} (outstanding: {outstanding})")
-        
+         
         payment_amount = flt(fee_lines[0].get("total", wc_order.total or 0))
         outstanding = flt(outstanding)
 
+        # PATCH: Do NOT crash on invalid amount (payment > outstanding or <= 0).
+        #        This is common when a partial payment already exists or the order is a child/split order.
+        #        Instead: log clearly and skip this portal payment entirely.
+        #        User can enter the payment manually in ERPNext.
+        #        Return True so the batch sync continues and never retries this WC order.
+        tolerance = 0.01
+        if payment_amount <= 0 or payment_amount > outstanding + tolerance:
+            error_msg = (
+                f"Portal payment amount invalid (too large or zero); skipping PE creation.\n"
+                f"WC Order: {wc_order.id}\n"
+                f"Reference: {doctype} {reference_no}\n"
+                f"Payment amount: {payment_amount}\n"
+                f"Outstanding: {outstanding}"
+            )
+            frappe.log_error(message=error_msg, title="WC Portal Payment Amount Invalid - Skipped")
+            return True
+
+
         # If the payment amount doesn't match the ERPNext doc amount, do nothing further.
         # (Avoids throwing and keeps the batch sync moving.)
-        tolerance = 0.01
         if payment_amount <= 0:
             return True
         if abs(payment_amount - outstanding) > tolerance:
