@@ -560,16 +560,13 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                     frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
                     frappe.db.commit()
                 
-                # Temporarily clear payment terms on new SO (mirroring existing logic)
-                original_so_terms = so.payment_terms_template
-                if so.payment_terms_template:
+                # Clear payment terms on the new SO (in memory only – submit() will persist)
+                original_so_terms = getattr(so, 'payment_terms_template', None)
+                if original_so_terms:
                     so.payment_terms_template = None
                 if hasattr(so, "payment_schedule"):
                     so.payment_schedule = []
-                so.save(ignore_permissions=True)
-                so.load_from_db()
-                
-                # Temporarily clear customer's payment_terms to prevent inheritance during submit
+
                 original_cust_terms = frappe.db.get_value("Customer", so.customer, "payment_terms")
                 try:
                     frappe.db.set_value("Customer", so.customer, "payment_terms", None)
@@ -583,7 +580,7 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
                     if original_quot_terms:
                         frappe.db.set_value("Quotation", quot.name, "payment_terms_template", original_quot_terms)
                         frappe.clear_cache(doctype="Quotation")  # Optional, for consistency
-                    if original_so_terms:
+                    if original_so_terms and so.name:  # already submitted, so use db_set
                         frappe.db.set_value("Sales Order", so.name, "payment_terms_template", original_so_terms)
                     frappe.db.commit()
                 
