@@ -467,6 +467,17 @@ def process_portal_payment(wc_order: WooCommerceOrder) -> bool:
         if not fee_lines:
             raise ValueError(f"No fee lines found in WC Order {wc_order.id}")
         
+        # === IDEMPOTENCY GUARD – prevent duplicate SO/PE creation ===
+        existing_so = frappe.db.get_value("Sales Order", {
+            "custom_woocommerce_order_id": wc_order.id,
+            "woocommerce_server": wc_order.woocommerce_server,
+            "docstatus": ["!=", 2]
+        })
+        if existing_so:
+            frappe.log_error(f"Portal payment for WC Order {wc_order.id} already processed (SO {existing_so} exists)", "WC Portal Duplicate Skipped")
+            return True
+        # ========================================================
+        
         # Get description from first fee line
         desc = fee_lines[0].get("name", "")
         if "Online Payment for Invoice / Reference #:" not in desc:
