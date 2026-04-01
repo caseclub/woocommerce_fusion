@@ -1621,7 +1621,7 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         else:
             # Loose substring match on contact name
             if expected_name_lower not in existing_full_name and existing_full_name not in expected_name_lower:
-                frappe.log_error(message=f"Name mismatch for potential customer {potential_cust['name']}: Expected '{individual_name}', Found '{existing_full_name.title()}' (from primary contact)", title="WC Merge Skip - Name Mismatch")
+                #frappe.log_error(message=f"Name mismatch for potential customer {potential_cust['name']}: Expected '{individual_name}', Found '{existing_full_name.title()}' (from primary contact)", title="WC Merge Skip - Name Mismatch")
                 return False
         
         # Address summary match with detailed diff logging
