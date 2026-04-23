@@ -1616,7 +1616,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         # If no existing contact name, skip name check (or log and proceed/ fail based on policy)
         # Here, we'll skip (assume match if company matches and no contact to compare)
         if not existing_full_name:
-            frappe.log_error(message=f"No primary contact found for potential customer {potential_cust['name']}. Skipping name check. Expected name: '{individual_name}'", title="WC Merge Skip - No Contact")
+            #frappe.log_error(message=f"No primary contact found for potential customer {potential_cust['name']}. Skipping name check. Expected name: '{individual_name}'", title="WC Merge Skip - No Contact")
+			pass
             # Proceed as if name matches, since company already matches
         else:
             # Loose substring match on contact name
