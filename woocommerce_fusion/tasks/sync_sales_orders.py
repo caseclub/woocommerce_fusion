@@ -940,6 +940,128 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         if len(sales_orders) > 0:
             self.sales_order = frappe.get_doc("Sales Order", sales_orders[0].name)
 
+    def _so_is_submitted(self, so_name) -> bool:
+        """True only if the Sales Order exists in the DB with docstatus=1."""
+        return bool(so_name) and frappe.utils.cint(frappe.db.get_value("Sales Order", so_name, "docstatus")) == 1
+
+    def _get_amazon_fba_warehouses(self, sales_order_or_name) -> Tuple[str, ...]:
+        so_name = sales_order_or_name if isinstance(sales_order_or_name, str) else sales_order_or_name.name
+        woocommerce_server = frappe.db.get_value("Sales Order", so_name, "woocommerce_server")
+        warehouses = ["Amazon FBA - CC"]
+
+        if woocommerce_server:
+            wc_server = frappe.get_cached_doc("WooCommerce Server", woocommerce_server)
+            configured_warehouse = getattr(wc_server, "custom_amazon_warehouse", None)
+            if configured_warehouse:
+                warehouses.insert(0, configured_warehouse)
+
+        return tuple(dict.fromkeys(warehouse for warehouse in warehouses if warehouse))
+
+    def _mark_completed_amazon_fba_delivered(self, so_name: str, wc_order_id=None) -> bool:
+        """
+        Post-submit cleanup for completed WooCommerce orders fulfilled from Amazon FBA.
+
+        WooCommerce/Amazon already considers these orders shipped, but ERPNext will keep
+        reserving stock forever unless the submitted SO Item rows are marked delivered.
+        """
+        if not self._so_is_submitted(so_name):
+            return False
+
+        fba_warehouses = self._get_amazon_fba_warehouses(so_name)
+        if not fba_warehouses:
+            return False
+
+        warehouse_placeholders = ", ".join(["%s"] * len(fba_warehouses))
+        fba_row = frappe.db.sql(
+            f"""SELECT name FROM `tabSales Order Item`
+                WHERE parent=%s
+                  AND parenttype='Sales Order'
+                  AND warehouse IN ({warehouse_placeholders})
+                LIMIT 1""",
+            (so_name, *fba_warehouses),
+        )
+        if not fba_row:
+            return False
+
+        pending_fba_rows = frappe.db.sql(
+            f"""SELECT name FROM `tabSales Order Item`
+                WHERE parent=%s
+                  AND parenttype='Sales Order'
+                  AND warehouse IN ({warehouse_placeholders})
+                  AND IFNULL(delivered_qty, 0) < IFNULL(qty, 0)
+                LIMIT 1""",
+            (so_name, *fba_warehouses),
+        )
+        per_delivered = flt(frappe.db.get_value("Sales Order", so_name, "per_delivered"))
+        if not pending_fba_rows and per_delivered >= 100:
+            return True
+
+        # If ERPNext has a stock-moving delivery document, let that document own delivered_qty.
+        stock_doc = frappe.db.sql(
+            """SELECT 1 FROM `tabDelivery Note Item`
+               WHERE against_sales_order=%s AND docstatus < 2 LIMIT 1""",
+            (so_name,),
+        ) or frappe.db.sql(
+            """SELECT 1 FROM `tabSales Invoice Item` sii
+               JOIN `tabSales Invoice` si ON si.name = sii.parent
+               WHERE sii.sales_order=%s AND si.docstatus < 2 AND si.update_stock = 1 LIMIT 1""",
+            (so_name,),
+        )
+        if stock_doc:
+            print(
+                f"[WC-FBA-SO-CLEANUP] {so_name}/{wc_order_id}: stock-moving DN/SI exists; "
+                "leaving delivered_qty to ERPNext",
+                flush=True,
+            )
+            return False
+
+        frappe.db.savepoint("wc_fba_so_delivered_cleanup")
+        try:
+            frappe.db.sql("SELECT name FROM `tabSales Order` WHERE name=%s FOR UPDATE", (so_name,))
+            so = frappe.get_doc("Sales Order", so_name)
+            if so.docstatus != 1:
+                frappe.db.rollback(save_point="wc_fba_so_delivered_cleanup")
+                return False
+
+            touched = False
+            for d in so.items:
+                if d.warehouse in fba_warehouses and flt(d.delivered_qty) < flt(d.qty):
+                    d.db_set("delivered_qty", d.qty, update_modified=False)
+                    d.delivered_qty = d.qty
+                    touched = True
+
+            total_qty = sum(flt(d.qty) for d in so.items)
+            total_delivered = sum(min(flt(d.delivered_qty), flt(d.qty)) for d in so.items)
+            computed_per_delivered = 100 if total_qty <= 0 else min(100, (total_delivered / total_qty) * 100)
+
+            if computed_per_delivered > flt(so.per_delivered):
+                so.db_set("per_delivered", computed_per_delivered, update_modified=False)
+                if computed_per_delivered >= 100 and not so.delivery_date:
+                    so.db_set("delivery_date", frappe.utils.nowdate(), update_modified=False)
+
+            if computed_per_delivered >= 100 and so.status not in ("Completed", "Closed", "On Hold"):
+                so.db_set("status", "Completed", update_modified=False)
+
+            if touched and hasattr(so, "update_reserved_qty"):
+                so.update_reserved_qty()
+
+            frappe.db.commit()
+            return True
+        except Exception:
+            try:
+                frappe.db.rollback(save_point="wc_fba_so_delivered_cleanup")
+            except Exception:
+                frappe.db.rollback()
+            frappe.log_error(
+                title=f"WC Amazon FBA SO Cleanup {wc_order_id or so_name}"[:140],
+                message=f"Sales Order {so_name} is submitted; only delivered/reserved cleanup failed "
+                        f"and can be retried on the next sync.\n\n{frappe.get_traceback()}",
+                reference_doctype="Sales Order",
+                reference_name=so_name,
+            )
+            frappe.db.commit()
+            return False
+
     def sync_wc_order_with_erpnext_order(self):
         """
         Syncronise Sales Order between ERPNext and WooCommerce
@@ -972,6 +1094,14 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 if updates:
                     frappe.db.set_value("Sales Order", self.sales_order.name, updates)
                     self.sales_order.reload()
+
+            if (
+                self.sales_order
+                and self.woocommerce_order
+                and self.sales_order.docstatus == 1
+                and self.woocommerce_order.status == "completed"
+            ):
+                self._mark_completed_amazon_fba_delivered(self.sales_order.name, self.woocommerce_order.id)
 
     def update_sales_order(self, woocommerce_order: WooCommerceOrder, sales_order: SalesOrder):
         """
@@ -1053,6 +1183,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
                 sales_order.reload()
 
         frappe.db.commit()
+        if sales_order.docstatus == 1 and woocommerce_order.status == "completed":
+            self._mark_completed_amazon_fba_delivered(sales_order.name, woocommerce_order.id)
 
     def create_and_link_payment_entry(
         self, wc_order: WooCommerceOrder, sales_order: SalesOrder
@@ -1497,6 +1629,8 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             self.create_and_submit_sales_invoice(new_sales_order)
             
         frappe.db.commit()
+        if new_sales_order.docstatus == 1 and wc_order.status == "completed":
+            self._mark_completed_amazon_fba_delivered(new_sales_order.name, wc_order.id)
 
     def create_or_link_customer_and_address(self, wc_order: WooCommerceOrder) -> str:
         """
