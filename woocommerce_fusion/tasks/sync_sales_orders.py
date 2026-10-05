@@ -963,8 +963,15 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
             # If the Sales Order exists and has been submitted in the mean time, sync Payment Entries
             if (self.sales_order.docstatus == 1 and not self.sales_order.woocommerce_payment_entry and not self.sales_order.custom_attempted_woocommerce_auto_payment_entry):
                 self.sales_order.reload()
-                if self.create_and_link_payment_entry(self.woocommerce_order, self.sales_order):
-                    self.sales_order.save()
+                pe_created, pe_name, attempted_flag = self.create_and_link_payment_entry(self.woocommerce_order, self.sales_order)
+                updates = {}
+                if pe_created and pe_name:
+                    updates["woocommerce_payment_entry"] = pe_name
+                if attempted_flag is not None:
+                    updates["custom_attempted_woocommerce_auto_payment_entry"] = attempted_flag
+                if updates:
+                    frappe.db.set_value("Sales Order", self.sales_order.name, updates)
+                    self.sales_order.reload()
 
     def update_sales_order(self, woocommerce_order: WooCommerceOrder, sales_order: SalesOrder):
         """
@@ -1355,6 +1362,30 @@ class SynchroniseSalesOrder(SynchroniseWooCommerce):
         Create an ERPNext Sales Order from the given WooCommerce Order
         """
         customer_docname = self.create_or_link_customer_and_address(wc_order)
+        if not customer_docname:
+            billing_summary = {}
+            try:
+                raw_billing_data = json.loads(wc_order.billing) if wc_order.billing else {}
+                billing_summary = {
+                    "first_name": raw_billing_data.get("first_name"),
+                    "last_name": raw_billing_data.get("last_name"),
+                    "company": raw_billing_data.get("company"),
+                    "email": raw_billing_data.get("email"),
+                    "phone": raw_billing_data.get("phone"),
+                    "postcode": raw_billing_data.get("postcode"),
+                    "country": raw_billing_data.get("country"),
+                }
+            except Exception:
+                billing_summary = {"raw_billing": wc_order.billing}
+
+            error_msg = (
+                f"Could not create or link Customer for WC Order {wc_order.id}; "
+                "Sales Order creation stopped before submit. "
+                f"Billing summary: {billing_summary}"
+            )
+            frappe.log_error(message=error_msg, title="WC Customer Link Error")
+            frappe.throw(error_msg)
+
         #self.create_missing_items(wc_order, json.loads(wc_order.line_items), wc_order.woocommerce_server)
 
         new_sales_order = frappe.new_doc("Sales Order")
@@ -2452,4 +2483,3 @@ def get_contacts_linking_to(doctype, docname, fields=None):
             ["Dynamic Link", "parenttype", "=", "Contact"],
         ],
     )
-
